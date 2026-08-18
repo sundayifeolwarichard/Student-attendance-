@@ -1,0 +1,11 @@
+{
+  "name": "Polytechnic Ibadan Student Attendance System",
+  "description": "Smart, fast, and secure student QR code attendance tracking system for The Polytechnic, Ibadan, Oyo State, Nigeria with multi-role access (Student, Lecturer, Administrator).",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
