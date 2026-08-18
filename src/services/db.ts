@@ -315,8 +315,8 @@ export const db = {
     }
   },
 
-  // Reset all to demo initial state
-  resetToDefaults: () => {
+  // Reset all to demo initial state and sync to Firestore
+  resetToDefaults: async () => {
     saveItem(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
     saveItem(STORAGE_KEYS.USERS, INITIAL_USERS);
     saveItem(STORAGE_KEYS.DEPARTMENTS, INITIAL_DEPARTMENTS);
@@ -329,6 +329,23 @@ export const db = {
     saveItem(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     saveItem(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
     saveItem(STORAGE_KEYS.ACTIVE_USER_ID, 'user_student_1');
+
+    // Sync seed data to Firestore
+    try {
+      await syncToFirestore('settings', 'system_config', INITIAL_SETTINGS);
+      INITIAL_USERS.forEach(u => u.id && syncToFirestore('users', u.id, u));
+      INITIAL_DEPARTMENTS.forEach(d => d.id && syncToFirestore('departments', d.id, d));
+      INITIAL_STUDENTS.forEach(s => s.id && syncToFirestore('students', s.id, s));
+      INITIAL_LECTURERS.forEach(l => l.id && syncToFirestore('lecturers', l.id, l));
+      INITIAL_COURSES.forEach(c => c.id && syncToFirestore('courses', c.id, c));
+      INITIAL_REGISTRATIONS.forEach(r => r.id && syncToFirestore('registrations', r.id, r));
+      INITIAL_SESSIONS.forEach(sess => sess.id && syncToFirestore('sessions', sess.id, sess));
+      INITIAL_RECORDS.forEach(rec => rec.id && syncToFirestore('records', rec.id, rec));
+      INITIAL_NOTIFICATIONS.forEach(n => n.id && syncToFirestore('notifications', n.id, n));
+      INITIAL_AUDIT_LOGS.forEach(log => log.id && syncToFirestore('audit_logs', log.id, log));
+    } catch (e) {
+      console.warn("Error seeding to Firestore during reset:", e);
+    }
 
     dbEvents.emit('data_reset');
     dbEvents.emit('auth_changed');

@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, StudentProfile, LecturerProfile } from '../../types';
 import { db } from '../../services/db';
+import { PolyLogo } from './PolyLogo';
 import {
   LayoutDashboard,
   QrCode,
@@ -84,17 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => onNavigate('dashboard')}
           id="sidebar-logo-brand"
         >
-          <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center font-bold text-slate-950 font-serif text-sm shadow-xs group-hover:scale-105 transition-transform shrink-0">
-            The
-          </div>
-          <div>
-            <h1 className="text-white font-bold leading-tight text-xs sm:text-sm tracking-tight font-sans">
-              The Polytechnic, Ibadan
-            </h1>
-            <p className="text-slate-400 text-[10px] tracking-wider font-medium mt-0.5">
-              Digital Attendance
-            </p>
-          </div>
+          <PolyLogo size="sm" subtitle="Digital Attendance" />
         </div>
       </div>
 
