@@ -72,7 +72,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
   const [currentSemester, setCurrentSemester] = useState('First Semester');
   const [settingsSaved, setSettingsSaved] = useState(false);
 
-  const loadData = () => {
+  const loadData = async () => {
+    await db.initializeFromFirestore();
     setStats(db.getAdminDashboardStats());
   };
 

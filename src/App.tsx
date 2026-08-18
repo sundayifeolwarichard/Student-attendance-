@@ -43,18 +43,26 @@ export default function App() {
   const [selectedCourseForSession, setSelectedCourseForSession] = useState<Course | null>(null);
   const [activeSessionPayload, setActiveSessionPayload] = useState<AttendanceSession | null>(null);
 
-  // Run cloud sync at application startup quietly in background without forcing auto-login
+  // Run cloud sync at application startup immediately
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const runSync = async () => {
       try {
-        if (firebaseUser) {
-          // Only sync cloud data quietly if a user is cached, but do not auto-login unless user clicks login
-          await db.initializeFromFirestore();
-        }
+        await db.initializeFromFirestore();
       } catch (err) {
         console.error("Initialization sync error:", err);
       } finally {
         setIsSyncing(false);
+      }
+    };
+    runSync();
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          await db.initializeFromFirestore(firebaseUser.uid);
+        }
+      } catch (err) {
+        console.error("Auth state change sync error:", err);
       }
     });
 
