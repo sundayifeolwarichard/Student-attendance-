@@ -43,18 +43,19 @@ export default function App() {
   const [selectedCourseForSession, setSelectedCourseForSession] = useState<Course | null>(null);
   const [activeSessionPayload, setActiveSessionPayload] = useState<AttendanceSession | null>(null);
 
-  // Run cloud sync at application startup immediately
+  // Run cloud sync quietly in the background while UI renders instantly with fade-in
   useEffect(() => {
-    const runSync = async () => {
+    // Set isSyncing to false instantly so UI renders immediately
+    setIsSyncing(false);
+
+    const runBackgroundSync = async () => {
       try {
         await db.initializeFromFirestore();
       } catch (err) {
-        console.error("Initialization sync error:", err);
-      } finally {
-        setIsSyncing(false);
+        console.error("Background initialization sync error:", err);
       }
     };
-    runSync();
+    runBackgroundSync();
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
