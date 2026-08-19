@@ -15,7 +15,8 @@ import {
   History,
   User as UserIcon,
   ShieldCheck,
-  Radio
+  Radio,
+  ArrowLeft
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -135,6 +136,19 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
+
+        {/* Move Back Button */}
+        {currentView !== 'dashboard' && (
+          <button
+            id="move-back-btn"
+            onClick={() => onNavigate('dashboard')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors mr-1 shadow-2xs"
+            title="Move Back"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Move Back</span>
+          </button>
+        )}
 
         <div>
           <div className="flex items-center gap-2.5">

@@ -24,19 +24,19 @@ export const PolyLogo: React.FC<PolyLogoProps> = ({
 
   return (
     <div className="flex items-center gap-3">
-      {/* Official Polytechnic Ibadan Logo */}
+      {/* Exact Official Polytechnic Ibadan Logo */}
       <div className={`shrink-0 ${containerSizeMap[size]}`}>
         <img
           src={logoImg}
           alt="The Polytechnic, Ibadan Logo"
-          className="w-full h-full object-contain rounded-lg"
+          className="w-full h-full object-contain"
           referrerPolicy="no-referrer"
         />
       </div>
 
       {showText && (
         <div className="flex flex-col leading-tight">
-          <span className={`font-bold tracking-tight text-slate-900 ${size === 'lg' || size === 'xl' ? 'text-base sm:text-lg' : 'text-sm'}`}>
+          <span className={`font-bold tracking-tight ${textColor} ${size === 'lg' || size === 'xl' ? 'text-base sm:text-lg' : 'text-sm'}`}>
             The Polytechnic, Ibadan
           </span>
           <span className="text-xs text-slate-500 font-normal mt-0.5">

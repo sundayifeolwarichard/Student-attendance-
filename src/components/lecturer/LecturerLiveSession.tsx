@@ -150,11 +150,17 @@ export const LecturerLiveSession: React.FC<LecturerLiveSessionProps> = ({
 
   useEffect(() => {
     refreshSessionData();
-    const unsub = dbEvents.on('attendance_recorded', (data) => {
-      if (session && data.sessionId === session.id) {
+    const unsubRec = dbEvents.on('attendance_recorded', (data) => {
+      if (session && (data.sessionId === session.id || data.record?.sessionId === session.id || data.session?.id === session.id)) {
         refreshSessionData();
-        setNewCheckInAlert(data.studentName);
+        setNewCheckInAlert(data.record?.studentName || data.studentName || 'Student');
         setTimeout(() => setNewCheckInAlert(null), 3000);
+      }
+    });
+
+    const unsubRecords = dbEvents.on('records_updated', () => {
+      if (session) {
+        refreshSessionData();
       }
     });
 
@@ -170,7 +176,8 @@ export const LecturerLiveSession: React.FC<LecturerLiveSessionProps> = ({
     }, 1000);
 
     return () => {
-      unsub();
+      unsubRec();
+      unsubRecords();
       clearInterval(timer);
     };
   }, [session?.id]);

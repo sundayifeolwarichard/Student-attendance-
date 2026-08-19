@@ -135,29 +135,14 @@ export const StudentScanner: React.FC<StudentScannerProps> = ({
     await stopCamera();
 
     try {
-      // Find session by matching qrToken
-      const activeSession = db.getActiveSessionByToken(qrToken);
-      if (!activeSession) {
-        throw new Error(
-          'Invalid or expired QR code. This session may have ended or the rolling token expired (10-second security window).'
-        );
-      }
+      const result = db.verifyAndRecordAttendance({
+        qrRawValue: qrToken,
+        studentUserId: student.userId,
+      });
 
-      // Check if student is registered in this course
-      const studentCourses = student.enrolledCourseIds || [];
-      if (!studentCourses.includes(activeSession.courseId)) {
-        throw new Error(
-          `You are not enrolled in ${activeSession.courseCode} (${activeSession.courseTitle}). Registration required.`
-        );
+      if (!result.success) {
+        throw new Error(result.error || 'Verification failed.');
       }
-
-      // Record attendance
-      const record = db.recordAttendance(
-        activeSession.id,
-        student.id,
-        qrToken,
-        'qr_scan'
-      );
 
       // Trigger celebration
       try {
@@ -171,8 +156,8 @@ export const StudentScanner: React.FC<StudentScannerProps> = ({
         // ignore
       }
 
-      setSuccessRecord(record);
-      setSuccessSession(activeSession);
+      setSuccessRecord(result.record!);
+      setSuccessSession(result.session!);
     } catch (err: any) {
       setErrorMessage(err.message || 'Verification failed. Please try again.');
     } finally {

@@ -33,7 +33,8 @@ import {
   doc,
   setDoc,
   deleteDoc,
-  query
+  query,
+  onSnapshot
 } from 'firebase/firestore';
 import { formatWATTime, formatWATDate, getWATDateString, getWATDate } from '../utils/time';
 
@@ -164,6 +165,8 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   ]);
 };
 
+let isClosingExpired = false;
+
 export const db = {
   // Direct firestore sync exporter
   syncToFirestore,
@@ -222,10 +225,45 @@ export const db = {
     return null;
   },
 
+  // Start real-time Firestore listeners for instant admin dashboard sync across all devices
+  startRealtimeListeners: () => {
+    if (!firestore) return;
+    const collectionsToListen = [
+      { col: 'students', key: STORAGE_KEYS.STUDENTS, event: 'students_updated', fallback: INITIAL_STUDENTS },
+      { col: 'lecturers', key: STORAGE_KEYS.LECTURERS, event: 'lecturers_updated', fallback: INITIAL_LECTURERS },
+      { col: 'users', key: STORAGE_KEYS.USERS, event: 'users_updated', fallback: INITIAL_USERS },
+      { col: 'records', key: STORAGE_KEYS.RECORDS, event: 'records_updated', fallback: INITIAL_RECORDS },
+      { col: 'sessions', key: STORAGE_KEYS.SESSIONS, event: 'sessions_updated', fallback: INITIAL_SESSIONS },
+    ];
+
+    collectionsToListen.forEach(item => {
+      try {
+        onSnapshot(collection(firestore, item.col), (snapshot) => {
+          if (!snapshot.empty) {
+            const docsData: any[] = [];
+            snapshot.forEach(doc => docsData.push(doc.data()));
+            const existing = loadItem<any[]>(item.key, item.fallback);
+            const docMap = new Map();
+            existing.forEach(e => docMap.set(e.id || e.userId || JSON.stringify(e), e));
+            docsData.forEach(d => docMap.set(d.id || d.userId || JSON.stringify(d), d));
+            const merged = Array.from(docMap.values());
+            saveItem(item.key, merged);
+            dbEvents.emit(item.event, merged);
+          }
+        }, () => {});
+      } catch (e) {
+        // ignore
+      }
+    });
+  },
+
   // Sync all data from Firestore to localStorage for cross-browser synchronization
   initializeFromFirestore: async (targetUserId?: string): Promise<boolean> => {
     try {
       if (!firestore) return false;
+
+      // Start real-time listeners for instant synchronization
+      db.startRealtimeListeners();
 
       // If a user ID is specified, sync their user profile immediately
       if (targetUserId) {
@@ -891,7 +929,27 @@ export const db = {
   // Attendance Sessions
   // -------------------------------------------------------------
   getSessions: (): AttendanceSession[] => {
-    return loadItem<AttendanceSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+    const sessions = loadItem<AttendanceSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+    if (isClosingExpired) {
+      return sessions;
+    }
+
+    const now = Date.now();
+    const expiredActiveSessions = sessions.filter(s => s.status === 'active' && s.expirationTime <= now);
+    if (expiredActiveSessions.length > 0) {
+      isClosingExpired = true;
+      try {
+        expiredActiveSessions.forEach(s => {
+          db.closeSession(s.id);
+        });
+      } catch (err) {
+        console.error("Error auto-closing expired sessions:", err);
+      } finally {
+        isClosingExpired = false;
+      }
+      return loadItem<AttendanceSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+    }
+    return sessions;
   },
   getSessionById: (id: string): AttendanceSession | undefined => {
     return db.getSessions().find(s => s.id === id || s.sessionId === id);
@@ -974,6 +1032,16 @@ export const db = {
           link: '/student/scan',
         });
       }
+    });
+
+    // Broadcast notification to all students so it appears as the first notification immediately
+    db.createNotification({
+      userId: 'all',
+      role: 'student',
+      title: `🚨 Attendance Live: ${course.code}`,
+      message: `${lecturer.title} ${lecturer.name} just started an attendance session for ${course.code} (${course.title}). Open your scanner now!`,
+      type: 'info',
+      link: '/student/scan',
     });
 
     db.addAuditLog('Attendance Started', `Lecturer ${lecturer.title} ${lecturer.name} started attendance for ${course.code} (${params.durationMinutes} mins).`, 'Lecturer');
@@ -1153,8 +1221,8 @@ export const db = {
     );
     if (alreadyAttended) {
       return {
-        success: true, // Idempotent success (already recorded)
-        error: 'You have already recorded attendance for this class.',
+        success: false,
+        error: 'You have already recorded attendance for this session! Duplicate scanning is not allowed.',
         errorCode: 'ALREADY_RECORDED',
         record: alreadyAttended,
         session,
@@ -1749,6 +1817,7 @@ export const db = {
     notifs.forEach(n => {
       if (!userId || n.userId === userId || n.userId === 'all') {
         n.read = true;
+        syncToFirestore('notifications', n.id, { read: true });
       }
     });
     saveItem(STORAGE_KEYS.NOTIFICATIONS, notifs);
