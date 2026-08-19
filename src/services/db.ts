@@ -929,27 +929,31 @@ export const db = {
   // Attendance Sessions
   // -------------------------------------------------------------
   getSessions: (): AttendanceSession[] => {
-    const sessions = loadItem<AttendanceSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
-    if (isClosingExpired) {
-      return sessions;
+    let sessions = loadItem<AttendanceSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+    if (!isClosingExpired) {
+      const now = Date.now();
+      const expiredActiveSessions = sessions.filter(s => s.status === 'active' && s.expirationTime <= now);
+      if (expiredActiveSessions.length > 0) {
+        isClosingExpired = true;
+        try {
+          expiredActiveSessions.forEach(s => {
+            db.closeSession(s.id);
+          });
+        } catch (err) {
+          console.error("Error auto-closing expired sessions:", err);
+        } finally {
+          isClosingExpired = false;
+        }
+        sessions = loadItem<AttendanceSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+      }
     }
 
-    const now = Date.now();
-    const expiredActiveSessions = sessions.filter(s => s.status === 'active' && s.expirationTime <= now);
-    if (expiredActiveSessions.length > 0) {
-      isClosingExpired = true;
-      try {
-        expiredActiveSessions.forEach(s => {
-          db.closeSession(s.id);
-        });
-      } catch (err) {
-        console.error("Error auto-closing expired sessions:", err);
-      } finally {
-        isClosingExpired = false;
-      }
-      return loadItem<AttendanceSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
-    }
-    return sessions;
+    // Sort newest first
+    return sessions.sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : a.expirationTime;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : b.expirationTime;
+      return timeB - timeA;
+    });
   },
   getSessionById: (id: string): AttendanceSession | undefined => {
     return db.getSessions().find(s => s.id === id || s.sessionId === id);
