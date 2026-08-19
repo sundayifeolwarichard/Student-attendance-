@@ -1,6 +1,6 @@
 import React from 'react';
 // @ts-ignore
-import logoImg from '../../assets/images/polytechnic_ibadan_logo_1787045490338.jpg';
+import logoImg from '../../assets/images/polytechnic_logo_1787125758758.jpg';
 
 interface PolyLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
