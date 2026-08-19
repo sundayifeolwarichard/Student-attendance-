@@ -14,7 +14,10 @@ import {
   ChevronRight,
   ShieldCheck,
   Award,
-  Sparkles
+  Sparkles,
+  History,
+  User as UserIcon,
+  LayoutDashboard
 } from 'lucide-react';
 
 interface StudentDashboardProps {
@@ -84,6 +87,44 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Student Portal Page Navigation Bar */}
+      <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 pl-2">
+          <LayoutDashboard className="w-4 h-4 text-emerald-700" />
+          <span className="text-xs font-bold text-slate-900">Student Navigation:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => onNavigate('scan')}
+            className="px-3 py-1.5 rounded-xl bg-emerald-750 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>Scan Attendance</span>
+          </button>
+          <button
+            onClick={() => onNavigate('courses')}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-slate-700" />
+            <span>My Courses</span>
+          </button>
+          <button
+            onClick={() => onNavigate('history')}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+          >
+            <History className="w-3.5 h-3.5 text-slate-700" />
+            <span>Attendance Log</span>
+          </button>
+          <button
+            onClick={() => onNavigate('profile')}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+          >
+            <UserIcon className="w-3.5 h-3.5 text-slate-700" />
+            <span>Digital ID</span>
+          </button>
+        </div>
+      </div>
+
       {/* High Contrast Academic Student Hero Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-emerald-950 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-slate-800/80 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-emerald-500/5 rounded-full blur-[60px] pointer-events-none -z-0" />

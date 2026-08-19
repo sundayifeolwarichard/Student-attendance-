@@ -16,7 +16,12 @@ import {
   ShieldCheck,
   Zap,
   Info,
-  X
+  X,
+  LayoutDashboard,
+  History,
+  BookOpen,
+  User as UserIcon,
+  ArrowLeft
 } from 'lucide-react';
 
 interface StudentScannerProps {
@@ -183,6 +188,42 @@ export const StudentScanner: React.FC<StudentScannerProps> = ({
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {/* Top Page Action Navigation Bar */}
+      <div className="flex items-center justify-between gap-2 p-2 bg-slate-900 rounded-2xl text-white shadow-sm border border-slate-800">
+        <button
+          id="scanner-back-to-dashboard-btn"
+          onClick={() => onNavigate('dashboard')}
+          className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Dashboard</span>
+        </button>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => onNavigate('history')}
+            className="px-3 py-1.5 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <History className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">History</span>
+          </button>
+          <button
+            onClick={() => onNavigate('courses')}
+            className="px-3 py-1.5 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Courses</span>
+          </button>
+          <button
+            onClick={() => onNavigate('profile')}
+            className="px-3 py-1.5 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <UserIcon className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Student ID</span>
+          </button>
+        </div>
+      </div>
+
       {/* Header Banner */}
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-300 text-slate-900 text-xs font-semibold">
@@ -385,25 +426,39 @@ export const StudentScanner: React.FC<StudentScannerProps> = ({
 
       {/* SUCCESS CONFIRMATION MODAL */}
       {successRecord && successSession && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-150 text-center relative overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 text-center relative overflow-hidden">
             {/* Top decorative stripe */}
             <div className="absolute top-0 left-0 right-0 h-2 bg-emerald-600"></div>
 
+            {/* Top Right Cancel / Close Button */}
+            <button
+              id="cancel-attendance-success-modal-btn"
+              onClick={() => {
+                setSuccessRecord(null);
+                setSuccessSession(null);
+                onNavigate('dashboard');
+              }}
+              className="absolute top-4 right-4 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer border border-slate-200"
+              title="Cancel & Return to Dashboard"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
             {/* Checkmark Icon */}
-            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-100">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 border border-emerald-100 mt-2">
               <CheckCircle2 className="w-10 h-10" />
             </div>
 
             <h2 className="text-xl sm:text-2xl font-bold font-serif text-slate-950">
-              Attendance Recorded Successfully
+              Attendance Recorded!
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Your attendance has been validated and recorded in West Africa Time (WAT).
+              Your attendance has been officially validated and saved.
             </p>
 
             {/* Official Receipt Card */}
-            <div className="my-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-2.5 font-mono text-xs">
+            <div className="my-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-2.5 font-mono text-xs">
               <div className="flex justify-between border-b border-slate-200/60 pb-2">
                 <span className="text-slate-500 font-sans">Course:</span>
                 <span className="font-bold text-slate-950">{successSession.courseCode} — {successSession.courseTitle}</span>
@@ -432,26 +487,47 @@ export const StudentScanner: React.FC<StudentScannerProps> = ({
               </div>
             </div>
 
-            {/* Modal action buttons */}
-            <div className="flex flex-col sm:flex-row gap-2.5">
+            {/* Modal Action Controls */}
+            <div className="space-y-2.5">
               <button
-                id="view-attendance-history-after-scan-btn"
-                onClick={() => onNavigate('history')}
-                className="flex-1 py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition-all border border-slate-200 cursor-pointer"
-              >
-                View Attendance History
-              </button>
-              <button
-                id="close-success-modal-btn"
+                id="close-cancel-success-modal-btn"
                 onClick={() => {
                   setSuccessRecord(null);
                   setSuccessSession(null);
                   onNavigate('dashboard');
                 }}
-                className="flex-1 py-3 px-4 rounded-xl bg-emerald-750 hover:bg-emerald-800 text-white font-bold text-xs transition-all cursor-pointer shadow-sm hover:shadow"
+                className="w-full py-3 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
               >
-                Back to Dashboard
+                <span>Cancel / Return to Dashboard</span>
               </button>
+
+              <div className="flex gap-2">
+                <button
+                  id="view-attendance-history-after-scan-btn"
+                  onClick={() => {
+                    setSuccessRecord(null);
+                    setSuccessSession(null);
+                    onNavigate('history');
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition-all border border-slate-200 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <History className="w-3.5 h-3.5 text-slate-700" />
+                  <span>View History</span>
+                </button>
+
+                <button
+                  id="scan-another-code-btn"
+                  onClick={() => {
+                    setSuccessRecord(null);
+                    setSuccessSession(null);
+                    startCamera();
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs transition-all border border-emerald-200 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <QrCode className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Scan Another</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
