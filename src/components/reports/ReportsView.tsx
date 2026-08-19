@@ -14,14 +14,17 @@ import {
   BookOpen,
   CheckCircle2,
   AlertTriangle,
-  Download
+  Download,
+  LayoutDashboard,
+  QrCode
 } from 'lucide-react';
 
 interface ReportsViewProps {
   user: User;
+  onNavigate?: (view: string) => void;
 }
 
-export const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
+export const ReportsView: React.FC<ReportsViewProps> = ({ user, onNavigate }) => {
   const [reportType, setReportType] = useState<string>('course');
   const [selectedCourseId, setSelectedCourseId] = useState<string>('all');
   const [selectedDept, setSelectedDept] = useState<string>('all');
@@ -121,7 +124,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onNavigate && (
+            <div className="flex items-center gap-2 mr-2">
+              <button
+                onClick={() => onNavigate('dashboard')}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Dashboard</span>
+              </button>
+            </div>
+          )}
           <button
             id="export-report-pdf-btn"
             onClick={handleExportPDF}

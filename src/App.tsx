@@ -243,13 +243,13 @@ export default function App() {
                   />
                 )}
                 {currentView === 'history' && (
-                  <StudentAttendanceHistory user={currentUser} />
+                  <StudentAttendanceHistory user={currentUser} onNavigate={handleNavigate} />
                 )}
                 {currentView === 'courses' && (
-                  <StudentCourses user={currentUser} />
+                  <StudentCourses user={currentUser} onNavigate={handleNavigate} />
                 )}
                 {currentView === 'profile' && (
-                  <StudentProfileView user={currentUser} />
+                  <StudentProfileView user={currentUser} onNavigate={handleNavigate} />
                 )}
               </>
             )}
@@ -273,10 +273,10 @@ export default function App() {
                   />
                 )}
                 {currentView === 'history' && (
-                  <LecturerAttendanceHistory user={currentUser} />
+                  <LecturerAttendanceHistory user={currentUser} onNavigate={handleNavigate} />
                 )}
                 {currentView === 'reports' && (
-                  <ReportsView user={currentUser} />
+                  <ReportsView user={currentUser} onNavigate={handleNavigate} />
                 )}
               </>
             )}
@@ -291,7 +291,7 @@ export default function App() {
                   />
                 )}
                 {currentView === 'reports' && (
-                  <ReportsView user={currentUser} />
+                  <ReportsView user={currentUser} onNavigate={handleNavigate} />
                 )}
               </>
             )}

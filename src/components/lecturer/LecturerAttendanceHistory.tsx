@@ -13,14 +13,17 @@ import {
   CheckCircle,
   XCircle,
   Eye,
-  X
+  X,
+  LayoutDashboard,
+  QrCode
 } from 'lucide-react';
 
 interface LecturerAttendanceHistoryProps {
   user: User;
+  onNavigate?: (view: string) => void;
 }
 
-export const LecturerAttendanceHistory: React.FC<LecturerAttendanceHistoryProps> = ({ user }) => {
+export const LecturerAttendanceHistory: React.FC<LecturerAttendanceHistoryProps> = ({ user, onNavigate }) => {
   const [lecturer, setLecturer] = useState<LecturerProfile | null>(
     db.getLecturerByUserId(user.id) || null
   );
@@ -80,13 +83,33 @@ export const LecturerAttendanceHistory: React.FC<LecturerAttendanceHistoryProps>
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold font-serif text-slate-950">
-          Attendance Session History
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500">
-          Review previous roll call sessions, student check-in logs, and absent student lists.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold font-serif text-slate-950">
+            Attendance Session History
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500">
+            Review previous roll call sessions, student check-in logs, and absent student lists.
+          </p>
+        </div>
+        {onNavigate && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onNavigate('dashboard')}
+              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>Dashboard</span>
+            </button>
+            <button
+              onClick={() => onNavigate('live_session')}
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Start Live QR Session</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">

@@ -13,14 +13,18 @@ import {
   XCircle,
   FileSpreadsheet,
   FileText,
-  FileDown
+  FileDown,
+  LayoutDashboard,
+  QrCode,
+  BookOpen
 } from 'lucide-react';
 
 interface StudentAttendanceHistoryProps {
   user: User;
+  onNavigate?: (view: string) => void;
 }
 
-export const StudentAttendanceHistory: React.FC<StudentAttendanceHistoryProps> = ({ user }) => {
+export const StudentAttendanceHistory: React.FC<StudentAttendanceHistoryProps> = ({ user, onNavigate }) => {
   const [student, setStudent] = useState<StudentProfile | null>(
     db.getStudentByUserId(user.id) || null
   );
@@ -138,8 +142,26 @@ export const StudentAttendanceHistory: React.FC<StudentAttendanceHistoryProps> =
           </p>
         </div>
 
-        {/* Export Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Navigation & Export Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {onNavigate && (
+            <div className="flex items-center gap-2 mr-2">
+              <button
+                onClick={() => onNavigate('dashboard')}
+                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Dashboard</span>
+              </button>
+              <button
+                onClick={() => onNavigate('scan')}
+                className="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Scan QR</span>
+              </button>
+            </div>
+          )}
           <button
             id="student-export-pdf-btn"
             onClick={handleExportPDF}

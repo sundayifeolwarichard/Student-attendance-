@@ -63,6 +63,34 @@ export const Header: React.FC<HeaderProps> = ({
     return () => unsubscribe();
   }, [currentUser]);
 
+  const getNavItems = () => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'student') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'scan', label: 'Scan QR Attendance', icon: QrCode },
+        { id: 'courses', label: 'My Courses', icon: BookOpen },
+        { id: 'history', label: 'Attendance History', icon: History },
+        { id: 'profile', label: 'Digital Student ID', icon: UserIcon },
+      ];
+    }
+    if (currentUser.role === 'lecturer') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'live_session', label: 'Live QR Session', icon: QrCode },
+        { id: 'history', label: 'Attendance History', icon: History },
+        { id: 'reports', label: 'Course Reports', icon: FileText },
+      ];
+    }
+    if (currentUser.role === 'admin') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'reports', label: 'Institutional Reports', icon: FileText },
+      ];
+    }
+    return [];
+  };
+
   const getViewTitle = () => {
     if (!currentUser) return 'Polytechnic Attendance System';
 
@@ -124,7 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 select-none">
+    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 select-none relative">
       {/* View Title & Role Status */}
       <div className="flex items-center gap-3">
         {/* Mobile toggle button */}
@@ -142,11 +170,11 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="move-back-btn"
             onClick={() => onNavigate('dashboard')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors mr-1 shadow-2xs"
-            title="Move Back"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-2xs mr-1 cursor-pointer"
+            title="Move Back to Dashboard"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Move Back</span>
+            <span className="hidden sm:inline">Back to Dashboard</span>
           </button>
         )}
 
