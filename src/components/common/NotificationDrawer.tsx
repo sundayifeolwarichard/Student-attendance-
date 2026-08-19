@@ -30,13 +30,22 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       if (isOpen) {
         const uid = currentUser?.id || currentUserId;
         const role = currentUser?.role;
+        let list: AppNotification[] = [];
         if (propsNotifications) {
-          setNotifications(propsNotifications);
+          list = Array.isArray(propsNotifications) ? [...propsNotifications] : Array.from(propsNotifications);
         } else if (uid) {
-          setNotifications(db.getNotifications(uid, role));
-        } else {
-          setNotifications([]);
+          const rawNotifs = db.getNotifications(uid, role);
+          list = Array.isArray(rawNotifs) ? [...rawNotifs] : Array.from(rawNotifs as any);
         }
+        
+        // Sort newest first
+        list.sort((a, b) => {
+          const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+          return timeB - timeA;
+        });
+        
+        setNotifications(list);
       }
     };
 

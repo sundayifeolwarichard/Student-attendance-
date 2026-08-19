@@ -1779,13 +1779,23 @@ export const db = {
       );
     }
 
+    // Sort by timestamp descending (newest first)
+    filtered.sort((a, b) => {
+      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return timeB - timeA;
+    });
+
     // Make return value both an Array and a Promise so synchronous callers and .then() callers work seamlessly!
     const promise = Promise.resolve(filtered) as any;
     Object.assign(promise, filtered);
-    // Provide array methods on promise
+    // Provide array methods and iterators on promise so spread operators and Array.from work seamlessly
     promise.filter = (fn: any) => filtered.filter(fn);
     promise.map = (fn: any) => filtered.map(fn);
     promise.length = filtered.length;
+    if (typeof (filtered as any)[Symbol.iterator] === 'function') {
+      promise[Symbol.iterator] = (filtered as any)[Symbol.iterator].bind(filtered);
+    }
     return promise;
   },
   createNotification: (data: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): AppNotification => {
