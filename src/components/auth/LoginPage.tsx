@@ -45,7 +45,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Student Registration Form States
-  const [registerRole, setRegisterRole] = useState<'student' | 'lecturer'>('student');
+  const [registerRole, setRegisterRole] = useState<'student' | 'lecturer' | 'admin'>('student');
   const [fullName, setFullName] = useState('');
   const [matricNumber, setMatricNumber] = useState('');
   const [phone, setPhone] = useState('');
@@ -54,9 +54,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [level, setLevel] = useState('HND II');
   const [academicSession, setAcademicSession] = useState('2025/2026');
 
-  // Lecturer Registration Specific States
+  // Lecturer & Admin Registration Specific States
   const [lecturerTitle, setLecturerTitle] = useState('Dr.');
   const [lecturerStaffId, setLecturerStaffId] = useState('');
+  const [adminStaffId, setAdminStaffId] = useState('');
+  const [adminDesignation, setAdminDesignation] = useState('System Administrator');
   const [lecturerLevels, setLecturerLevels] = useState<string[]>([]);
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
   const [showCustomCourseInput, setShowCustomCourseInput] = useState(false);
@@ -184,9 +186,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setError('Please provide your Polytechnic Ibadan matriculation number.');
         return;
       }
-    } else {
+    } else if (registerRole === 'lecturer') {
       if (!lecturerStaffId.trim()) {
         setError('Please provide your institutional Staff Identification Number.');
+        return;
+      }
+    } else {
+      if (!adminStaffId.trim()) {
+        setError('Please provide your Admin Officer Staff ID.');
         return;
       }
     }
@@ -215,7 +222,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           academicSession: academicSession,
           phone: phone.trim() || '+234 800 000 0000',
         }, password.trim());
-      } else {
+      } else if (registerRole === 'lecturer') {
         createdUser = await db.registerLecturerAsync({
           userId: uid,
           name: fullName.trim(),
@@ -226,6 +233,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           department: 'Computer Science',
           assignedCourseIds: selectedCourseIds,
           levelsTaking: lecturerLevels
+        }, password.trim());
+      } else {
+        createdUser = await db.registerAdminAsync({
+          userId: uid,
+          name: fullName.trim(),
+          email: trimmedEmail,
+          staffId: adminStaffId.trim().toUpperCase(),
+          designation: adminDesignation.trim() || 'System Administrator',
+          phone: phone.trim() || '+234 800 000 0000',
         }, password.trim());
       }
       
@@ -477,12 +493,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </button>
                 </div>
               )}
+
+              {selectedRole === 'admin' && (
+                <div className="pt-4 border-t border-slate-200 text-center text-xs text-slate-600 space-y-2">
+                  <div className="text-slate-500">
+                    <span className="font-semibold text-slate-700">New Administrator or System Overseer?</span>
+                  </div>
+                  <button
+                    type="button"
+                    id="register-admin-toggle-btn"
+                    onClick={() => {
+                      setIsRegistering(true);
+                      setRegisterRole('admin');
+                      setError(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 font-semibold text-slate-950 text-xs transition-colors"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Register Administrator Account</span>
+                  </button>
+                </div>
+              )}
             </form>
           ) : (
-            /* Registration Form (Student or Lecturer) */
+            /* Registration Form (Student, Lecturer, or Admin) */
             <form onSubmit={handleRegister} className="space-y-4">
               {/* Account Type Selector for Registration */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 mb-4">
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-slate-100 mb-4">
                 <button
                   type="button"
                   id="reg-role-student-btn"
@@ -490,13 +527,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     setRegisterRole('student');
                     setError(null);
                   }}
-                  className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                  className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1 transition-all ${
                     registerRole === 'student'
-                      ? 'bg-slate-950 text-white shadow-xs'
+                      ? 'bg-slate-950 text-white shadow-xs font-bold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                   }`}
                 >
-                  <GraduationCap className="w-4 h-4" />
+                  <GraduationCap className="w-3.5 h-3.5" />
                   <span>Student</span>
                 </button>
                 <button
@@ -506,18 +543,130 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     setRegisterRole('lecturer');
                     setError(null);
                   }}
-                  className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                  className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1 transition-all ${
                     registerRole === 'lecturer'
-                      ? 'bg-slate-950 text-white shadow-xs'
+                      ? 'bg-slate-950 text-white shadow-xs font-bold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                   }`}
                 >
-                  <BookOpen className="w-4 h-4" />
-                  <span>Lecturer / Staff</span>
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Lecturer</span>
+                </button>
+                <button
+                  type="button"
+                  id="reg-role-admin-btn"
+                  onClick={() => {
+                    setRegisterRole('admin');
+                    setError(null);
+                  }}
+                  className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1 transition-all ${
+                    registerRole === 'admin'
+                      ? 'bg-slate-950 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Admin</span>
                 </button>
               </div>
 
-              {registerRole === 'lecturer' ? (
+              {registerRole === 'admin' ? (
+                /* Admin-specific fields */
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Full Name (Surname First)
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="register-admin-name-input"
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={e => setFullName(e.target.value)}
+                        placeholder="e.g. PROF. OLATUNJI Sunday Richard"
+                        className="block w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Administrative Designation / Title
+                      </label>
+                      <input
+                        id="register-admin-designation-input"
+                        type="text"
+                        required
+                        value={adminDesignation}
+                        onChange={e => setAdminDesignation(e.target.value)}
+                        placeholder="e.g. Head of ICT / System Overseer"
+                        className="block w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Admin Officer Staff ID
+                      </label>
+                      <input
+                        id="register-admin-staffid-input"
+                        type="text"
+                        required
+                        value={adminStaffId}
+                        onChange={e => setAdminStaffId(e.target.value)}
+                        placeholder="TPI/ADM/2026/001"
+                        className="block w-full px-3 py-2 text-xs font-mono uppercase border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Phone Number
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                          <Phone className="w-3.5 h-3.5" />
+                        </div>
+                        <input
+                          id="register-admin-phone-input"
+                          type="tel"
+                          value={phone}
+                          onChange={e => setPhone(e.target.value)}
+                          placeholder="+234 802 000 0000"
+                          className="block w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Institutional Admin Email
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                          <Mail className="w-4 h-4" />
+                        </div>
+                        <input
+                          id="register-admin-email-input"
+                          type="email"
+                          required
+                          value={email}
+                          onChange={e => setEmail(e.target.value)}
+                          placeholder="admin@polyibadan.edu.ng"
+                          className="block w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-slate-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : registerRole === 'lecturer' ? (
                 /* Lecturer-specific fields */
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

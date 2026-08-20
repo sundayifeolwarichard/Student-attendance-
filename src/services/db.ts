@@ -53,6 +53,26 @@ const STORAGE_KEYS = {
   ACTIVE_USER_ID: 'tpi_attendance_active_user_id',
 };
 
+// Automatic version check to force-purge legacy mock data from browser LocalStorage
+const DB_VERSION_KEY = 'tpi_attendance_db_version';
+const CURRENT_DB_VERSION = 'v3_complete_wipe_all_mock';
+
+try {
+  if (typeof localStorage !== 'undefined') {
+    const existingVer = localStorage.getItem(DB_VERSION_KEY);
+    if (existingVer !== CURRENT_DB_VERSION) {
+      Object.values(STORAGE_KEYS).forEach(k => {
+        if (k !== STORAGE_KEYS.SETTINGS) {
+          localStorage.removeItem(k);
+        }
+      });
+      localStorage.setItem(DB_VERSION_KEY, CURRENT_DB_VERSION);
+    }
+  }
+} catch (e) {
+  console.warn("Error running local storage version migration:", e);
+}
+
 // Event listener mechanism for real-time reactivity
 type EventCallback = (data?: any) => void;
 class EventEmitter {
@@ -88,16 +108,11 @@ export const dbEvents = new EventEmitter();
 function loadItem<T>(key: string, fallback: T): T {
   try {
     const data = localStorage.getItem(key);
-    if (!data) {
+    if (data === null) {
       localStorage.setItem(key, JSON.stringify(fallback));
       return fallback;
     }
     const parsed = JSON.parse(data);
-    // If it's an array and empty or invalid, fallback safely
-    if (Array.isArray(fallback) && (!Array.isArray(parsed) || parsed.length === 0)) {
-      localStorage.setItem(key, JSON.stringify(fallback));
-      return fallback;
-    }
     return parsed as T;
   } catch (err) {
     console.error(`Error loading key ${key}:`, err);
@@ -340,36 +355,39 @@ export const db = {
     }
   },
 
-  // Reset all to demo initial state and sync to Firestore
+  // Reset/wipe all data completely from LocalStorage and Firestore
   resetToDefaults: async () => {
     saveItem(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
-    saveItem(STORAGE_KEYS.USERS, INITIAL_USERS);
-    saveItem(STORAGE_KEYS.DEPARTMENTS, INITIAL_DEPARTMENTS);
-    saveItem(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
-    saveItem(STORAGE_KEYS.LECTURERS, INITIAL_LECTURERS);
-    saveItem(STORAGE_KEYS.COURSES, INITIAL_COURSES);
-    saveItem(STORAGE_KEYS.REGISTRATIONS, INITIAL_REGISTRATIONS);
-    saveItem(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
-    saveItem(STORAGE_KEYS.RECORDS, INITIAL_RECORDS);
-    saveItem(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-    saveItem(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
+    saveItem(STORAGE_KEYS.USERS, []);
+    saveItem(STORAGE_KEYS.DEPARTMENTS, []);
+    saveItem(STORAGE_KEYS.STUDENTS, []);
+    saveItem(STORAGE_KEYS.LECTURERS, []);
+    saveItem(STORAGE_KEYS.COURSES, []);
+    saveItem(STORAGE_KEYS.REGISTRATIONS, []);
+    saveItem(STORAGE_KEYS.SESSIONS, []);
+    saveItem(STORAGE_KEYS.RECORDS, []);
+    saveItem(STORAGE_KEYS.NOTIFICATIONS, []);
+    saveItem(STORAGE_KEYS.AUDIT_LOGS, []);
     saveItem(STORAGE_KEYS.ACTIVE_USER_ID, '');
 
-    // Sync seed data to Firestore
+    // Delete all records from Firestore collections
     try {
-      await syncToFirestore('settings', 'system_config', INITIAL_SETTINGS);
-      INITIAL_USERS.forEach(u => u.id && syncToFirestore('users', u.id, u));
-      INITIAL_DEPARTMENTS.forEach(d => d.id && syncToFirestore('departments', d.id, d));
-      INITIAL_STUDENTS.forEach(s => s.id && syncToFirestore('students', s.id, s));
-      INITIAL_LECTURERS.forEach(l => l.id && syncToFirestore('lecturers', l.id, l));
-      INITIAL_COURSES.forEach(c => c.id && syncToFirestore('courses', c.id, c));
-      INITIAL_REGISTRATIONS.forEach(r => r.id && syncToFirestore('registrations', r.id, r));
-      INITIAL_SESSIONS.forEach(sess => sess.id && syncToFirestore('sessions', sess.id, sess));
-      INITIAL_RECORDS.forEach(rec => rec.id && syncToFirestore('records', rec.id, rec));
-      INITIAL_NOTIFICATIONS.forEach(n => n.id && syncToFirestore('notifications', n.id, n));
-      INITIAL_AUDIT_LOGS.forEach(log => log.id && syncToFirestore('audit_logs', log.id, log));
+      if (firestore) {
+        const collectionsToClear = [
+          'users', 'departments', 'students', 'lecturers',
+          'courses', 'registrations', 'sessions', 'records',
+          'notifications', 'audit_logs'
+        ];
+        for (const colName of collectionsToClear) {
+          const snapshot = await getDocs(collection(firestore, colName));
+          snapshot.forEach(docSnap => {
+            deleteFromFirestore(colName, docSnap.id);
+          });
+        }
+        await syncToFirestore('settings', 'system_config', INITIAL_SETTINGS);
+      }
     } catch (e) {
-      console.warn("Error seeding to Firestore during reset:", e);
+      console.warn("Error wiping Firestore during reset:", e);
     }
 
     dbEvents.emit('data_reset');
@@ -1573,6 +1591,39 @@ export const db = {
     db.addAuditLog('Lecturer Registered', `New academic staff registered: ${fullTitleName} (${newLecturer.staffId}).`, 'System');
     dbEvents.emit('users_updated', users);
     dbEvents.emit('lecturers_updated', lecturers);
+    return newUser;
+  },
+
+  registerAdminAsync: async (adminData: { name: string; email: string; phone?: string; staffId?: string; designation?: string; userId?: string }, password = 'password123'): Promise<User> => {
+    const uid = adminData.userId || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const currentYear = new Date().getFullYear();
+    const adminStaffId = (adminData.staffId || `TPI/ADM/${currentYear}/${Math.floor(100 + Math.random() * 900)}`).toUpperCase().trim();
+
+    const newUser: User = {
+      id: uid,
+      name: adminData.name || 'System Administrator',
+      email: (adminData.email || 'admin@polyibadan.edu.ng').toLowerCase().trim(),
+      role: 'admin',
+      phone: adminData.phone || '+234 800 000 0000',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+
+    const users = db.getUsers();
+    const existingIndex = users.findIndex(u => u.id === uid || u.email.toLowerCase() === newUser.email.toLowerCase());
+    if (existingIndex >= 0) {
+      users[existingIndex] = { ...users[existingIndex], ...newUser };
+    } else {
+      users.push(newUser);
+    }
+    saveItem(STORAGE_KEYS.USERS, users);
+
+    Promise.allSettled([
+      syncToFirestore('users', uid, newUser)
+    ]).catch(err => console.warn("Background admin sync note:", err));
+
+    db.addAuditLog('Admin Registered', `New administrator account created: ${newUser.name} (${adminData.designation || 'System Overseer'} - ${adminStaffId}).`, 'System');
+    dbEvents.emit('users_updated', users);
     return newUser;
   },
 
