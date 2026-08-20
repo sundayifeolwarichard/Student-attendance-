@@ -37,7 +37,8 @@ import {
   Mail,
   Phone,
   ShieldCheck,
-  Check
+  Check,
+  Database
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -838,6 +839,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
               className="py-2.5 px-6 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs"
             >
               Save System Parameters
+            </button>
+          </div>
+
+          <hr className="border-slate-200 my-6" />
+
+          {/* Database Synchronization & Sample Seeding */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+              <Database className="w-5 h-5 shrink-0 text-emerald-600" />
+              <span>Firebase Database Seeding & Initialization</span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              If your Firestore database collections were cleared or empty, click below to automatically populate sample Students, Lecturers, Courses, and Departments into your live Firestore database.
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await db.seedSampleDataAsync();
+                loadData();
+                alert(`Database Seeding Complete!\n\nPopulated:\n- ${res.studentsCount} Students in 'students'\n- ${res.lecturersCount} Lecturers in 'lecturers'\n- ${res.coursesCount} Courses in 'courses'\n- ${res.departmentsCount} Departments in 'departments'\n\nAll records have been synchronized to Firestore!`);
+              }}
+              className="py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-colors"
+            >
+              <Database className="w-4 h-4" />
+              <span>Seed Sample Data to Firebase Firestore</span>
             </button>
           </div>
 

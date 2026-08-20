@@ -29,29 +29,42 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   user,
   onNavigate,
 }) => {
-  const [student, setStudent] = useState<StudentProfile | null>(
-    db.getStudentByUserId(user.id) || null
-  );
-  const [stats, setStats] = useState(
-    student ? db.getStudentAttendanceStats(student.id) : null
-  );
+  const [student, setStudent] = useState<StudentProfile>(() => {
+    const existing = db.getStudentByUserId(user.id);
+    if (existing) return existing;
+    return {
+      id: `student_${user.id}`,
+      userId: user.id,
+      name: user.name || 'Student User',
+      email: user.email,
+      matricNumber: 'ND/CS/25/001',
+      school: 'School of Science & Technology',
+      department: 'Computer Science',
+      programme: 'Higher National Diploma',
+      level: 'HND II',
+      academicSession: '2025/2026',
+      phone: user.phone || '+234 800 000 0000',
+      status: 'active',
+      enrolledCourseIds: db.getCourses().map(c => c.id),
+    };
+  });
+
+  const [stats, setStats] = useState(() => db.getStudentAttendanceStats(student.id));
   const [activeSessions, setActiveSessions] = useState<AttendanceSession[]>([]);
 
   const refreshData = () => {
-    const s = db.getStudentByUserId(user.id);
-    setStudent(s || null);
-    if (s) {
-      setStats(db.getStudentAttendanceStats(s.id));
-      const allActive = db.getActiveSessions();
-      const studentCourses = new Set(s.enrolledCourseIds || []);
-      const filtered = allActive.filter(sess => studentCourses.has(sess.courseId));
-      filtered.sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : a.expirationTime;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : b.expirationTime;
-        return timeB - timeA;
-      });
-      setActiveSessions(filtered);
-    }
+    const s = db.getStudentByUserId(user.id) || student;
+    setStudent(s);
+    setStats(db.getStudentAttendanceStats(s.id));
+    const allActive = db.getActiveSessions();
+    const studentCourses = new Set(s.enrolledCourseIds || []);
+    const filtered = allActive.filter(sess => studentCourses.has(sess.courseId));
+    filtered.sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : a.expirationTime;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : b.expirationTime;
+      return timeB - timeA;
+    });
+    setActiveSessions(filtered);
   };
 
   useEffect(() => {

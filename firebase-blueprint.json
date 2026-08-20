@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Polytechnic student profile and course enrollment details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique student profile document ID" },
+        "userId": { "type": "string", "description": "Associated user account ID" },
+        "name": { "type": "string", "description": "Full name of the student" },
+        "matricNumber": { "type": "string", "description": "Official institutional matriculation number" },
+        "email": { "type": "string", "format": "email", "description": "Institutional email address" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "school": { "type": "string", "description": "School or faculty within the institution" },
+        "department": { "type": "string", "description": "Academic department name" },
+        "programme": { "type": "string", "description": "Academic programme (e.g., National Diploma)" },
+        "level": { "type": "string", "description": "Current level (e.g., ND II, HND II)" },
+        "academicSession": { "type": "string", "description": "Current academic session" },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "enrolledCourseIds": {
+          "type": "array",
+          "description": "List of course IDs the student is enrolled in"
+        },
+        "avatarUrl": { "type": "string", "description": "Optional profile avatar URL" }
+      },
+      "required": ["id", "userId", "name", "matricNumber", "email", "department", "programme", "level", "academicSession", "status", "enrolledCourseIds"]
+    },
+    "Lecturer": {
+      "title": "Lecturer",
+      "description": "Lecturer staff profile and course assignments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique lecturer profile document ID" },
+        "userId": { "type": "string", "description": "Associated user account ID" },
+        "name": { "type": "string", "description": "Full name of the lecturer" },
+        "staffId": { "type": "string", "description": "Institutional staff ID number" },
+        "email": { "type": "string", "format": "email", "description": "Institutional email address" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "department": { "type": "string", "description": "Academic department name" },
+        "title": { "type": "string", "description": "Lecturer title (e.g. Dr., Engr., Mrs., Prof.)" },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "assignedCourseIds": {
+          "type": "array",
+          "description": "List of course IDs assigned to the lecturer"
+        },
+        "levelsTaking": {
+          "type": "array",
+          "description": "Levels taught by lecturer"
+        },
+        "avatarUrl": { "type": "string", "description": "Optional profile avatar URL" }
+      },
+      "required": ["id", "userId", "name", "staffId", "email", "department", "title", "status", "assignedCourseIds"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Student profile documents"
+    },
+    "/lecturers/{lecturerId}": {
+      "schema": { "$ref": "#/entities/Lecturer" },
+      "description": "Lecturer profile documents"
+    }
+  }
+}

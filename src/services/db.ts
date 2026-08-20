@@ -514,7 +514,61 @@ export const db = {
     return db.getStudents().find(s => s.id === id);
   },
   getStudentByUserId: (userId: string): StudentProfile | undefined => {
-    return db.getStudents().find(s => s.userId === userId);
+    const students = db.getStudents();
+    let found = students.find(s => s.userId === userId || s.id === userId);
+    if (found) return found;
+
+    // Fallback: search by user email
+    const users = db.getUsers();
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      found = students.find(s => s.email.toLowerCase() === user.email.toLowerCase());
+      if (found) {
+        found.userId = user.id;
+        saveItem(STORAGE_KEYS.STUDENTS, students);
+        return found;
+      }
+
+      // If user is a student, automatically construct & persist a complete StudentProfile
+      if (user.role === 'student') {
+        const allCourses = db.getCourses();
+        const defaultCourses = allCourses.map(c => c.id);
+        const newStudent: StudentProfile = {
+          id: `student_${user.id}`,
+          userId: user.id,
+          name: user.name || 'Student User',
+          email: user.email,
+          matricNumber: `ND/CS/25/${Math.floor(100 + Math.random() * 900)}`,
+          school: 'School of Science & Technology',
+          department: 'Computer Science',
+          programme: 'Higher National Diploma',
+          level: 'HND II',
+          academicSession: '2025/2026',
+          phone: user.phone || '+234 800 000 0000',
+          status: 'active',
+          enrolledCourseIds: defaultCourses,
+          avatarUrl: user.avatarUrl,
+        };
+
+        students.push(newStudent);
+        saveItem(STORAGE_KEYS.STUDENTS, students);
+        syncToFirestore('students', newStudent.id, newStudent);
+
+        // Auto-register courses
+        defaultCourses.forEach(cid => {
+          db.registerStudentForCourse(newStudent.id, cid);
+        });
+
+        return newStudent;
+      }
+    }
+
+    // Secondary fallback: if students list is empty or any student exists
+    if (students.length > 0) {
+      return students[0];
+    }
+
+    return undefined;
   },
   getStudentByMatric: (matric: string): StudentProfile | undefined => {
     return db.getStudents().find(s => s.matricNumber.trim().toUpperCase() === matric.trim().toUpperCase());
@@ -593,8 +647,12 @@ export const db = {
     deleteFromFirestore('students', id);
     db.deleteUser(student.userId);
 
-    // Remove registrations
-    let regs = db.getRegistrations().filter(r => r.studentId !== id);
+    // Remove registrations and purge from Firestore
+    const allRegs = loadItem<CourseRegistration[]>(STORAGE_KEYS.REGISTRATIONS, INITIAL_REGISTRATIONS);
+    const regsToDelete = allRegs.filter(r => r.studentId === id);
+    regsToDelete.forEach(r => deleteFromFirestore('registrations', r.id));
+
+    let regs = allRegs.filter(r => r.studentId !== id);
     saveItem(STORAGE_KEYS.REGISTRATIONS, regs);
 
     db.addAuditLog('Student Deleted', `Student record for ${student.name} (${student.matricNumber}) was deleted.`, 'Administrator');
@@ -613,7 +671,50 @@ export const db = {
     return db.getLecturers().find(l => l.id === id);
   },
   getLecturerByUserId: (userId: string): LecturerProfile | undefined => {
-    return db.getLecturers().find(l => l.userId === userId);
+    const lecturers = db.getLecturers();
+    let found = lecturers.find(l => l.userId === userId || l.id === userId);
+    if (found) return found;
+
+    const users = db.getUsers();
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      found = lecturers.find(l => l.email.toLowerCase() === user.email.toLowerCase());
+      if (found) {
+        found.userId = user.id;
+        saveItem(STORAGE_KEYS.LECTURERS, lecturers);
+        return found;
+      }
+
+      if (user.role === 'lecturer') {
+        const allCourses = db.getCourses();
+        const defaultCourseIds = allCourses.slice(0, 2).map(c => c.id);
+        const newLecturer: LecturerProfile = {
+          id: `lecturer_${user.id}`,
+          userId: user.id,
+          name: user.name || 'Lecturer Staff',
+          email: user.email,
+          staffId: `TPI/ST/2026/${Math.floor(100 + Math.random() * 900)}`,
+          title: 'Dr.',
+          department: 'Computer Science',
+          phone: user.phone || '+234 800 000 0000',
+          status: 'active',
+          assignedCourseIds: defaultCourseIds,
+          levelsTaking: ['HND II', 'ND II'],
+          avatarUrl: user.avatarUrl,
+        };
+
+        lecturers.push(newLecturer);
+        saveItem(STORAGE_KEYS.LECTURERS, lecturers);
+        syncToFirestore('lecturers', newLecturer.id, newLecturer);
+        return newLecturer;
+      }
+    }
+
+    if (lecturers.length > 0) {
+      return lecturers[0];
+    }
+
+    return undefined;
   },
   getLecturerByStaffId: (staffId: string): LecturerProfile | undefined => {
     return db.getLecturers().find(l => l.staffId.trim().toUpperCase() === staffId.trim().toUpperCase());
@@ -851,8 +952,12 @@ export const db = {
     saveItem(STORAGE_KEYS.COURSES, courses);
     deleteFromFirestore('courses', id);
 
-    // Cleanup registrations
-    let regs = db.getRegistrations().filter(r => r.courseId !== id);
+    // Cleanup registrations and purge from Firestore
+    const allRegs = loadItem<CourseRegistration[]>(STORAGE_KEYS.REGISTRATIONS, INITIAL_REGISTRATIONS);
+    const regsToDelete = allRegs.filter(r => r.courseId === id);
+    regsToDelete.forEach(r => deleteFromFirestore('registrations', r.id));
+
+    let regs = allRegs.filter(r => r.courseId !== id);
     saveItem(STORAGE_KEYS.REGISTRATIONS, regs);
 
     db.addAuditLog('Course Deleted', `Course ${course.code} - ${course.title} removed from system.`, 'Administrator');
@@ -868,13 +973,28 @@ export const db = {
     let regs = loadItem<CourseRegistration[]>(STORAGE_KEYS.REGISTRATIONS, INITIAL_REGISTRATIONS);
     const courses = db.getCourses();
     const validCourseIds = new Set(courses.map(c => c.id));
-    return regs.filter(r => validCourseIds.has(r.courseId));
+    const students = db.getStudents();
+    const validStudentIds = new Set(students.map(s => s.id));
+
+    // Filter out orphan registrations pointing to deleted courses or non-existent students
+    const validRegs = regs.filter(r => validCourseIds.has(r.courseId) && validStudentIds.has(r.studentId));
+
+    // If orphan registrations were detected, clean them up from local storage and Firestore
+    if (validRegs.length !== regs.length) {
+      const orphans = regs.filter(r => !validCourseIds.has(r.courseId) || !validStudentIds.has(r.studentId));
+      orphans.forEach(o => deleteFromFirestore('registrations', o.id));
+      saveItem(STORAGE_KEYS.REGISTRATIONS, validRegs);
+    }
+
+    return validRegs;
   },
   getStudentRegistrations: (studentId: string): CourseRegistration[] => {
     return db.getRegistrations().filter(r => r.studentId === studentId);
   },
   getCourseRegistrations: (courseId: string): CourseRegistration[] => {
-    return db.getRegistrations().filter(r => r.courseId === courseId);
+    const validRegs = db.getRegistrations().filter(r => r.courseId === courseId);
+    const activeStudentIds = new Set(db.getStudents().map(s => s.id));
+    return validRegs.filter(r => activeStudentIds.has(r.studentId));
   },
   isStudentRegisteredForCourse: (studentId: string, courseId: string): boolean => {
     return db.getRegistrations().some(r => r.studentId === studentId && r.courseId === courseId);
@@ -1716,7 +1836,12 @@ export const db = {
     const activeSessions = sessions.filter(s => s.status === 'active' && s.expirationTime > now);
     
     const allRegistrations = db.getRegistrations().filter(r => courseIds.has(r.courseId));
-    const uniqueStudents = new Set(allRegistrations.map(r => r.studentId));
+    const activeStudentIds = new Set(db.getStudents().map(s => s.id));
+    const uniqueStudents = new Set(
+      allRegistrations
+        .map(r => r.studentId)
+        .filter(id => activeStudentIds.has(id))
+    );
 
     const totalPossibleAttendances = sessions.reduce((sum, s) => sum + (s.totalRegistered || 0), 0);
     const totalPresent = records.length;
@@ -1917,5 +2042,271 @@ export const db = {
     syncToFirestore('audit_logs', newLog.id, newLog);
     dbEvents.emit('audit_logs_updated');
     return newLog;
+  },
+
+  // Seed sample institutional data into local storage and sync directly to Firestore
+  seedSampleDataAsync: async (): Promise<{ studentsCount: number; lecturersCount: number; coursesCount: number; departmentsCount: number }> => {
+    const sampleDepts: Department[] = [
+      {
+        id: 'dept_cs',
+        name: 'Computer Science',
+        code: 'CS',
+        faculty: 'Faculty of Science & Technology',
+        programmes: ['National Diploma', 'Higher National Diploma'],
+        headOfDepartment: 'Dr. O. R. Sunday',
+      },
+      {
+        id: 'dept_eee',
+        name: 'Electrical & Electronics Engineering',
+        code: 'EEE',
+        faculty: 'Faculty of Engineering',
+        programmes: ['National Diploma', 'Higher National Diploma'],
+        headOfDepartment: 'Engr. M. Adebayo',
+      },
+      {
+        id: 'dept_slt',
+        name: 'Science Laboratory Technology',
+        code: 'SLT',
+        faculty: 'Faculty of Science & Technology',
+        programmes: ['National Diploma', 'Higher National Diploma'],
+        headOfDepartment: 'Dr. (Mrs) F. A. Ogun',
+      }
+    ];
+
+    const sampleCourses: Course[] = [
+      {
+        id: 'course_com311',
+        code: 'COM 311',
+        title: 'Operating Systems I',
+        department: 'Computer Science',
+        level: 'HND I',
+        semester: 'First Semester',
+        units: 3,
+        lecturerId: 'user_lecturer_1',
+        lecturerName: 'Dr. Sunday OLATUNJI',
+        academicSession: '2025/2026',
+      },
+      {
+        id: 'course_com312',
+        code: 'COM 312',
+        title: 'Database Design I',
+        department: 'Computer Science',
+        level: 'HND I',
+        semester: 'First Semester',
+        units: 3,
+        lecturerId: 'user_lecturer_1',
+        lecturerName: 'Dr. Sunday OLATUNJI',
+        academicSession: '2025/2026',
+      },
+      {
+        id: 'course_com411',
+        code: 'COM 411',
+        title: 'Software Engineering',
+        department: 'Computer Science',
+        level: 'HND II',
+        semester: 'First Semester',
+        units: 4,
+        lecturerId: 'user_lecturer_1',
+        lecturerName: 'Dr. Sunday OLATUNJI',
+        academicSession: '2025/2026',
+      },
+      {
+        id: 'course_com412',
+        code: 'COM 412',
+        title: 'Computer Architecture',
+        department: 'Computer Science',
+        level: 'HND II',
+        semester: 'First Semester',
+        units: 3,
+        lecturerId: 'user_lecturer_2',
+        lecturerName: 'Engr. Michael ADEBAYO',
+        academicSession: '2025/2026',
+      }
+    ];
+
+    const lecturer1User: User = {
+      id: 'user_lecturer_1',
+      name: 'Dr. Sunday OLATUNJI',
+      email: 's.olatunji@staff.polyibadan.edu.ng',
+      role: 'lecturer',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      phone: '+234 803 111 2233',
+    };
+    const lecturer1Profile: LecturerProfile = {
+      id: 'lecturer_1',
+      userId: 'user_lecturer_1',
+      name: 'Dr. Sunday OLATUNJI',
+      email: 's.olatunji@staff.polyibadan.edu.ng',
+      staffId: 'TPI/ST/2026/010',
+      title: 'Dr.',
+      department: 'Computer Science',
+      phone: '+234 803 111 2233',
+      status: 'active',
+      assignedCourseIds: ['course_com311', 'course_com312', 'course_com411'],
+      levelsTaking: ['HND I', 'HND II'],
+    };
+
+    const lecturer2User: User = {
+      id: 'user_lecturer_2',
+      name: 'Engr. Michael ADEBAYO',
+      email: 'm.adebayo@staff.polyibadan.edu.ng',
+      role: 'lecturer',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      phone: '+234 802 444 5566',
+    };
+    const lecturer2Profile: LecturerProfile = {
+      id: 'lecturer_2',
+      userId: 'user_lecturer_2',
+      name: 'Engr. Michael ADEBAYO',
+      email: 'm.adebayo@staff.polyibadan.edu.ng',
+      staffId: 'TPI/ST/2026/012',
+      title: 'Engr.',
+      department: 'Computer Science',
+      phone: '+234 802 444 5566',
+      status: 'active',
+      assignedCourseIds: ['course_com411', 'course_com412'],
+      levelsTaking: ['HND II'],
+    };
+
+    const student1User: User = {
+      id: 'user_student_1',
+      name: 'ADEWALE John Babatunde',
+      email: 'j.adewale@polyibadan.edu.ng',
+      role: 'student',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      phone: '+234 810 555 6677',
+    };
+    const student1Profile: StudentProfile = {
+      id: 'student_1',
+      userId: 'user_student_1',
+      name: 'ADEWALE John Babatunde',
+      email: 'j.adewale@polyibadan.edu.ng',
+      matricNumber: 'ND/CS/25/001',
+      school: 'School of Science & Technology',
+      department: 'Computer Science',
+      programme: 'Higher National Diploma',
+      level: 'HND II',
+      academicSession: '2025/2026',
+      phone: '+234 810 555 6677',
+      status: 'active',
+      enrolledCourseIds: ['course_com411', 'course_com412'],
+    };
+
+    const student2User: User = {
+      id: 'user_student_2',
+      name: 'OGUNLEYE Blessing Toyin',
+      email: 'b.ogunleye@polyibadan.edu.ng',
+      role: 'student',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      phone: '+234 813 888 9900',
+    };
+    const student2Profile: StudentProfile = {
+      id: 'student_2',
+      userId: 'user_student_2',
+      name: 'OGUNLEYE Blessing Toyin',
+      email: 'b.ogunleye@polyibadan.edu.ng',
+      matricNumber: 'ND/CS/25/002',
+      school: 'School of Science & Technology',
+      department: 'Computer Science',
+      programme: 'Higher National Diploma',
+      level: 'HND II',
+      academicSession: '2025/2026',
+      phone: '+234 813 888 9900',
+      status: 'active',
+      enrolledCourseIds: ['course_com411', 'course_com412'],
+    };
+
+    const student3User: User = {
+      id: 'user_student_3',
+      name: 'IBEKWE Emmanuel Chukwuemeka',
+      email: 'e.ibekwe@polyibadan.edu.ng',
+      role: 'student',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      phone: '+234 814 111 3344',
+    };
+    const student3Profile: StudentProfile = {
+      id: 'student_3',
+      userId: 'user_student_3',
+      name: 'IBEKWE Emmanuel Chukwuemeka',
+      email: 'e.ibekwe@polyibadan.edu.ng',
+      matricNumber: 'ND/CS/25/003',
+      school: 'School of Science & Technology',
+      department: 'Computer Science',
+      programme: 'National Diploma',
+      level: 'ND II',
+      academicSession: '2025/2026',
+      phone: '+234 814 111 3344',
+      status: 'active',
+      enrolledCourseIds: ['course_com311', 'course_com312'],
+    };
+
+    const currentUsers = db.getUsers();
+    const currentStudents = db.getStudents();
+    const currentLecturers = db.getLecturers();
+    const currentCourses = db.getCourses();
+    const currentDepts = db.getDepartments();
+
+    const newUsers = [...currentUsers];
+    [lecturer1User, lecturer2User, student1User, student2User, student3User].forEach(u => {
+      if (!newUsers.some(existing => existing.id === u.id || existing.email === u.email)) {
+        newUsers.push(u);
+        syncToFirestore('users', u.id, u);
+      }
+    });
+    saveItem(STORAGE_KEYS.USERS, newUsers);
+
+    const newStudents = [...currentStudents];
+    [student1Profile, student2Profile, student3Profile].forEach(s => {
+      if (!newStudents.some(existing => existing.id === s.id || existing.email === s.email)) {
+        newStudents.push(s);
+        syncToFirestore('students', s.id, s);
+      }
+    });
+    saveItem(STORAGE_KEYS.STUDENTS, newStudents);
+
+    const newLecturers = [...currentLecturers];
+    [lecturer1Profile, lecturer2Profile].forEach(l => {
+      if (!newLecturers.some(existing => existing.id === l.id || existing.email === l.email)) {
+        newLecturers.push(l);
+        syncToFirestore('lecturers', l.id, l);
+      }
+    });
+    saveItem(STORAGE_KEYS.LECTURERS, newLecturers);
+
+    const newCourses = [...currentCourses];
+    sampleCourses.forEach(c => {
+      if (!newCourses.some(existing => existing.id === c.id || existing.code === c.code)) {
+        newCourses.push(c);
+        syncToFirestore('courses', c.id, c);
+      }
+    });
+    saveItem(STORAGE_KEYS.COURSES, newCourses);
+
+    const newDepts = [...currentDepts];
+    sampleDepts.forEach(d => {
+      if (!newDepts.some(existing => existing.id === d.id || existing.code === d.code)) {
+        newDepts.push(d);
+        syncToFirestore('departments', d.id, d);
+      }
+    });
+    saveItem(STORAGE_KEYS.DEPARTMENTS, newDepts);
+
+    dbEvents.emit('users_updated');
+    dbEvents.emit('students_updated');
+    dbEvents.emit('lecturers_updated');
+    dbEvents.emit('courses_updated');
+    dbEvents.emit('departments_updated');
+
+    return {
+      studentsCount: newStudents.length,
+      lecturersCount: newLecturers.length,
+      coursesCount: newCourses.length,
+      departmentsCount: newDepts.length,
+    };
   },
 };
