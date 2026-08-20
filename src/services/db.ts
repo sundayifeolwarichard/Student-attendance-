@@ -180,6 +180,16 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   ]);
 };
 
+export const normalizeLevel = (l?: string): string => {
+  if (!l) return '';
+  const clean = l.trim().toUpperCase().replace(/\s+/g, '');
+  return clean
+    .replace('HND2', 'HNDII')
+    .replace('HND1', 'HNDI')
+    .replace('ND2', 'NDII')
+    .replace('ND1', 'NDI');
+};
+
 let isClosingExpired = false;
 
 export const db = {
@@ -518,16 +528,17 @@ export const db = {
     if (allCourses.length === 0) return [];
 
     const targetDept = (department || 'Computer Science').trim().toLowerCase();
-    const targetLevel = (level || 'HND II').trim().toUpperCase();
-
-    const normalizeLevel = (l: string) => l.toUpperCase().replace(/\s+/g, '').replace('2', 'II').replace('1', 'I');
-    const normTargetLevel = normalizeLevel(targetLevel);
+    const normTargetLevel = normalizeLevel(level || 'HND II');
 
     let matches = allCourses.filter(c => {
-      const deptMatch = c.department.trim().toLowerCase() === targetDept;
+      const deptMatch = !c.department || c.department.trim().toLowerCase() === targetDept;
       const levelMatch = normalizeLevel(c.level) === normTargetLevel;
       return deptMatch && levelMatch;
     });
+
+    if (matches.length === 0) {
+      matches = allCourses.filter(c => normalizeLevel(c.level) === normTargetLevel);
+    }
 
     if (matches.length === 0) {
       matches = allCourses.filter(c => c.department.trim().toLowerCase() === targetDept);
@@ -903,10 +914,31 @@ export const db = {
   getCoursesByLecturer: (lecturerId: string): Course[] => {
     const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
     const possibleIds = new Set([lecturerId, lecturer?.id, lecturer?.userId].filter(Boolean));
-    return db.getCourses().filter(c => 
-      possibleIds.has(c.lecturerId) || 
-      (lecturer?.assignedCourseIds && lecturer.assignedCourseIds.includes(c.id))
-    );
+    const allCourses = db.getCourses();
+
+    return allCourses.filter(c => {
+      // 1. Direct lecturerId match
+      if (possibleIds.has(c.lecturerId)) return true;
+
+      // 2. Course ID listed in assignedCourseIds
+      if (lecturer?.assignedCourseIds && lecturer.assignedCourseIds.includes(c.id)) return true;
+
+      // 3. Department & Level match if lecturer has levelsTaking
+      if (lecturer && lecturer.levelsTaking && lecturer.levelsTaking.length > 0) {
+        const lecturerLevels = lecturer.levelsTaking.map(normalizeLevel);
+        const courseLevel = normalizeLevel(c.level);
+        const deptMatch = !c.department || !lecturer.department || c.department.trim().toLowerCase() === lecturer.department.trim().toLowerCase();
+        if (deptMatch && lecturerLevels.includes(courseLevel)) return true;
+      }
+
+      // 4. Default fallback for lecturers in Computer Science if no courses are explicitly assigned
+      if (lecturer && (!lecturer.assignedCourseIds || lecturer.assignedCourseIds.length === 0) && (!c.lecturerId || c.lecturerId === '')) {
+        const deptMatch = !c.department || !lecturer.department || c.department.trim().toLowerCase() === lecturer.department.trim().toLowerCase();
+        if (deptMatch) return true;
+      }
+
+      return false;
+    });
   },
   getCoursesByDepartment: (department: string): Course[] => {
     return db.getCourses().filter(c => c.department.toLowerCase() === department.toLowerCase());
@@ -999,7 +1031,7 @@ export const db = {
     const courses = db.getCourses();
     const validCourseIds = new Set(courses.map(c => c.id));
     const students = db.getStudents();
-    const validStudentIds = new Set(students.map(s => s.id));
+    const validStudentIds = new Set(students.flatMap(s => [s.id, s.userId].filter(Boolean)));
 
     // Filter out orphan registrations pointing to deleted courses or non-existent students
     const validRegs = regs.filter(r => validCourseIds.has(r.courseId) && validStudentIds.has(r.studentId));
@@ -1853,8 +1885,14 @@ export const db = {
   },
 
   getLecturerAttendanceStats: (lecturerId: string) => {
+    const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
     const courses = db.getCoursesByLecturer(lecturerId);
     const courseIds = new Set(courses.map(c => c.id));
+    const courseLevels = new Set(courses.map(c => normalizeLevel(c.level)));
+    if (lecturer?.levelsTaking) {
+      lecturer.levelsTaking.forEach(l => courseLevels.add(normalizeLevel(l)));
+    }
+
     const sessions = db.getSessions().filter(s => courseIds.has(s.courseId));
     const records = db.getRecords().filter(r => courseIds.has(r.courseId) && r.status === 'PRESENT');
     const now = Date.now();
@@ -1872,14 +1910,29 @@ export const db = {
       }
     });
 
-    // 2. Student profile enrolledCourseIds (with auto-sync)
+    // 2. Student profile enrolledCourseIds or level match
+    const lecturerDept = (lecturer?.department || 'Computer Science').trim().toLowerCase();
     activeStudents.forEach(s => {
       const enrolled = s.enrolledCourseIds || [];
-      if (enrolled.some(cid => courseIds.has(cid))) {
+      const studentDept = (s.department || 'Computer Science').trim().toLowerCase();
+      const studentNormLevel = normalizeLevel(s.level);
+
+      const hasDirectCourseMatch = enrolled.some(cid => courseIds.has(cid));
+      const hasLevelMatch = (studentDept === lecturerDept || !lecturerDept) && courseLevels.has(studentNormLevel);
+
+      if (hasDirectCourseMatch || hasLevelMatch) {
         registeredStudentIds.add(s.id);
-        enrolled.forEach(cid => {
-          if (courseIds.has(cid) && !db.isStudentRegisteredForCourse(s.id, cid)) {
-            db.registerStudentForCourse(s.id, cid);
+
+        // Auto-heal / sync missing registrations and enrolledCourseIds
+        courses.forEach(c => {
+          if (normalizeLevel(c.level) === studentNormLevel || hasDirectCourseMatch) {
+            if (!enrolled.includes(c.id)) {
+              s.enrolledCourseIds = [...enrolled, c.id];
+              db.updateStudent(s.id, { enrolledCourseIds: s.enrolledCourseIds });
+            }
+            if (!db.isStudentRegisteredForCourse(s.id, c.id)) {
+              db.registerStudentForCourse(s.id, c.id);
+            }
           }
         });
       }
