@@ -152,14 +152,14 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 select-none relative z-30">
+    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 select-none relative">
       {/* View Title & Role Status */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex items-center gap-3">
         {/* Mobile toggle button */}
         <button
           id="header-mobile-menu-btn"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 text-slate-700 hover:text-slate-950 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0"
+          className="md:hidden p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
           aria-label="Toggle Navigation Menu"
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -170,55 +170,53 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="move-back-btn"
             onClick={() => onNavigate('dashboard')}
-            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-2xs shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-2xs mr-1 cursor-pointer"
             title="Move Back to Dashboard"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Back to Dashboard</span>
-            <span className="sm:hidden text-[11px]">Back</span>
           </button>
         )}
 
-        <div className="truncate">
-          <div className="flex items-center gap-2 truncate">
-            <h2 className="font-bold text-sm sm:text-base lg:text-lg text-slate-900 tracking-tight leading-none truncate">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h2 className="font-bold text-base sm:text-lg text-slate-900 tracking-tight leading-none">
               {getViewTitle()}
             </h2>
-            <div className="hidden lg:inline-block shrink-0">
+            <div className="hidden sm:inline-block">
               {getStatusBadge()}
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 font-medium tracking-tight mt-0.5 hidden sm:block truncate">
+          <p className="text-[10px] text-slate-400 font-medium tracking-tight mt-0.5 hidden md:block">
             The Polytechnic, Ibadan • Academic Session 2025/2026
           </p>
         </div>
       </div>
 
       {/* Right Action & Clock Area */}
-      <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 shrink-0">
+      <div className="flex items-center gap-4 sm:gap-6">
         {/* Real-time WAT Clock */}
         <div className="text-right">
           <p className="text-[9px] sm:text-[10px] text-slate-400 font-semibold uppercase tracking-tight flex items-center justify-end gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block animate-pulse"></span>
-            <span className="hidden xs:inline">West Africa Time (WAT)</span>
-            <span className="xs:hidden">WAT</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-900 inline-block"></span>
+            West Africa Time (WAT)
           </p>
-          <p className="text-[11px] sm:text-xs lg:text-sm font-mono font-bold text-slate-800 tracking-tight">
-            <span className="hidden sm:inline">{currentDate} • </span>{currentTime}
+          <p className="text-xs sm:text-sm font-mono font-bold text-slate-800 tracking-tight">
+            {currentDate} • {currentTime}
           </p>
         </div>
 
         {/* Notifications & Action Bar */}
-        <div className="flex items-center gap-1 pl-2 sm:pl-3 border-l border-slate-200">
+        <div className="flex items-center gap-1.5 pl-3 border-l border-slate-200">
           <button
             id="header-notifications-btn"
             onClick={onToggleNotifications}
-            className="relative p-2 text-slate-600 hover:text-black hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            className="relative p-2 text-slate-600 hover:text-black hover:bg-slate-100 rounded-lg transition-colors"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center">
+              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-bold flex items-center justify-center">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -228,7 +226,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="header-signout-btn"
             onClick={onLogout}
-            className="md:hidden p-2 text-slate-500 hover:text-black hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            className="md:hidden p-2 text-slate-500 hover:text-black hover:bg-slate-100 rounded-lg transition-colors"
             title="Sign Out"
           >
             <LogOut className="w-4 h-4" />
@@ -236,164 +234,114 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Mobile Navigation Drawer / Backdrop Overlay */}
+      {/* Mobile navigation popdown */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-start animate-fade-in">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setMobileMenuOpen(false)}
-          />
+        <div className="absolute top-16 left-0 right-0 bg-slate-950 text-white z-50 p-4 border-b border-slate-800 shadow-xl md:hidden space-y-1">
+          <div className="pb-2 border-b border-slate-800 mb-2 flex items-center justify-between text-xs text-slate-300">
+            <span>Signed in as <strong>{currentUser?.name}</strong></span>
+            <span className="text-[10px] bg-slate-900 border border-slate-700 px-2 py-0.5 rounded font-mono uppercase">{currentUser?.role}</span>
+          </div>
 
-          {/* Nav Sheet */}
-          <div className="relative bg-slate-950 text-white z-10 w-full max-h-[85vh] overflow-y-auto p-4 border-b border-slate-800 shadow-2xl space-y-2">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 font-bold flex items-center justify-center text-xs">
-                  {currentUser?.name?.charAt(0) || '?'}
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-white leading-none">{currentUser?.name}</p>
-                  <p className="text-[10px] text-slate-400 font-mono mt-0.5 uppercase">{currentUser?.role}</p>
-                </div>
-              </div>
+          {currentUser?.role === 'student' && (
+            <>
               <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900 border border-slate-800"
+                onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
               >
-                <X className="w-4 h-4" />
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Dashboard</span>
               </button>
-            </div>
-
-            <div className="py-1 space-y-1">
-              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Menu Options
-              </div>
-
-              {currentUser?.role === 'student' && (
-                <>
-                  <button
-                    onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'dashboard' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    <span>Dashboard</span>
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('scan'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'scan' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <QrCode className="w-4 h-4 text-emerald-400" />
-                    <span className="font-bold text-white">Scan Attendance</span>
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('courses'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'courses' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    <span>My Courses</span>
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('history'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'history' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <History className="w-4 h-4" />
-                    <span>Attendance History</span>
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('profile'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'profile' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <UserIcon className="w-4 h-4" />
-                    <span>Digital Student ID</span>
-                  </button>
-                </>
-              )}
-
-              {currentUser?.role === 'lecturer' && (
-                <>
-                  <button
-                    onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'dashboard' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    <span>Dashboard</span>
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('live_session'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'live_session' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <QrCode className="w-4 h-4 text-emerald-400" />
-                    <span className="font-bold text-white">Live QR Session</span>
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('history'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'history' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <History className="w-4 h-4" />
-                    <span>Attendance History</span>
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('reports'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'reports' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>Course Reports</span>
-                  </button>
-                </>
-              )}
-
-              {currentUser?.role === 'admin' && (
-                <>
-                  <button
-                    onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'dashboard' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    <span>Dashboard Console</span>
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('reports'); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-medium flex items-center gap-3 ${
-                      currentView === 'reports' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>Institutional Reports</span>
-                  </button>
-                </>
-              )}
-            </div>
-
-            <div className="pt-3 border-t border-slate-800">
               <button
-                onClick={() => { setMobileMenuOpen(false); onLogout(); }}
-                className="w-full text-center px-3.5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-red-400 hover:text-red-300 text-xs font-bold flex items-center justify-center gap-2 border border-slate-800 cursor-pointer"
+                onClick={() => { onNavigate('scan'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5 text-white font-bold"
               >
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out Account</span>
+                <QrCode className="w-4 h-4" />
+                <span>Scan Attendance</span>
               </button>
-            </div>
+              <button
+                onClick={() => { onNavigate('courses'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>My Courses</span>
+              </button>
+              <button
+                onClick={() => { onNavigate('history'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
+              >
+                <History className="w-4 h-4" />
+                <span>Attendance History</span>
+              </button>
+              <button
+                onClick={() => { onNavigate('profile'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
+              >
+                <UserIcon className="w-4 h-4" />
+                <span>Student ID</span>
+              </button>
+            </>
+          )}
+
+          {currentUser?.role === 'lecturer' && (
+            <>
+              <button
+                onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Dashboard</span>
+              </button>
+              <button
+                onClick={() => { onNavigate('live_session'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5 text-white font-bold"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Live QR Session</span>
+              </button>
+              <button
+                onClick={() => { onNavigate('history'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
+              >
+                <History className="w-4 h-4" />
+                <span>Attendance History</span>
+              </button>
+              <button
+                onClick={() => { onNavigate('reports'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Course Reports</span>
+              </button>
+            </>
+          )}
+
+          {currentUser?.role === 'admin' && (
+            <>
+              <button
+                onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Dashboard</span>
+              </button>
+              <button
+                onClick={() => { onNavigate('reports'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-900 text-xs font-medium flex items-center gap-2.5"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Institutional Reports</span>
+              </button>
+            </>
+          )}
+
+          <div className="pt-2 border-t border-slate-800 mt-2">
+            <button
+              onClick={onLogout}
+              className="w-full text-left px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center gap-2.5 border border-slate-700"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </div>
       )}

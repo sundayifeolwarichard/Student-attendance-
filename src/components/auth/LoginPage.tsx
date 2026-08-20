@@ -217,7 +217,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           name: fullName.trim(),
           email: trimmedEmail,
           matricNumber: matricNumber.trim().toUpperCase(),
-          department: 'Computer Science',
           programme: programme,
           level: studentLevel,
           academicSession: academicSession,

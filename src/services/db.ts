@@ -180,16 +180,6 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   ]);
 };
 
-export const normalizeLevel = (l?: string): string => {
-  if (!l) return '';
-  const clean = l.trim().toUpperCase().replace(/\s+/g, '');
-  return clean
-    .replace('HND2', 'HNDII')
-    .replace('HND1', 'HNDI')
-    .replace('ND2', 'NDII')
-    .replace('ND1', 'NDI');
-};
-
 let isClosingExpired = false;
 
 export const db = {
@@ -523,22 +513,51 @@ export const db = {
   getStudentById: (id: string): StudentProfile | undefined => {
     return db.getStudents().find(s => s.id === id || s.userId === id);
   },
+  getLecturerTakenCourseIds: (): string[] => {
+    const courseIds = new Set<string>();
+    try {
+      const lecturers = loadItem<LecturerProfile[]>(STORAGE_KEYS.LECTURERS, INITIAL_LECTURERS);
+      lecturers.forEach(l => {
+        if (l.assignedCourseIds && Array.isArray(l.assignedCourseIds)) {
+          l.assignedCourseIds.forEach(id => {
+            if (id && typeof id === 'string') courseIds.add(id);
+          });
+        }
+      });
+
+      const courses = loadItem<Course[]>(STORAGE_KEYS.COURSES, INITIAL_COURSES);
+      courses.forEach(c => {
+        if (c.lecturerId && typeof c.lecturerId === 'string' && c.lecturerId.trim() !== '' && c.lecturerId.toLowerCase() !== 'unassigned') {
+          courseIds.add(c.id);
+        }
+      });
+
+      const sessions = loadItem<AttendanceSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+      sessions.forEach(s => {
+        if (s.courseId && typeof s.courseId === 'string') {
+          courseIds.add(s.courseId);
+        }
+      });
+    } catch (e) {
+      console.warn("Error getting lecturer taken courses:", e);
+    }
+    return Array.from(courseIds);
+  },
   getMatchingCoursesForStudent: (department?: string, level?: string): string[] => {
     const allCourses = db.getCourses();
     if (allCourses.length === 0) return [];
 
     const targetDept = (department || 'Computer Science').trim().toLowerCase();
-    const normTargetLevel = normalizeLevel(level || 'HND II');
+    const targetLevel = (level || 'HND II').trim().toUpperCase();
+
+    const normalizeLevel = (l: string) => l.toUpperCase().replace(/\s+/g, '').replace('2', 'II').replace('1', 'I');
+    const normTargetLevel = normalizeLevel(targetLevel);
 
     let matches = allCourses.filter(c => {
-      const deptMatch = !c.department || c.department.trim().toLowerCase() === targetDept;
+      const deptMatch = c.department.trim().toLowerCase() === targetDept;
       const levelMatch = normalizeLevel(c.level) === normTargetLevel;
       return deptMatch && levelMatch;
     });
-
-    if (matches.length === 0) {
-      matches = allCourses.filter(c => normalizeLevel(c.level) === normTargetLevel);
-    }
 
     if (matches.length === 0) {
       matches = allCourses.filter(c => c.department.trim().toLowerCase() === targetDept);
@@ -548,12 +567,31 @@ export const db = {
       matches = allCourses;
     }
 
-    return matches.map(c => c.id);
+    const matchedIds = matches.map(c => c.id);
+    const lecturerTakenIds = db.getLecturerTakenCourseIds();
+
+    const combined = new Set<string>([...matchedIds, ...lecturerTakenIds]);
+    return Array.from(combined);
   },
   getStudentByUserId: (userId: string): StudentProfile | undefined => {
     const students = db.getStudents();
     let found = students.find(s => s.userId === userId || s.id === userId);
-    if (found) return found;
+    const lecturerTakenIds = db.getLecturerTakenCourseIds();
+
+    if (found) {
+      if (lecturerTakenIds.length > 0) {
+        const missing = lecturerTakenIds.filter(cid => !found!.enrolledCourseIds.includes(cid));
+        if (missing.length > 0) {
+          found.enrolledCourseIds = Array.from(new Set([...found.enrolledCourseIds, ...missing]));
+          saveItem(STORAGE_KEYS.STUDENTS, students);
+          syncToFirestore('students', found.id, found);
+          missing.forEach(cid => {
+            db.registerStudentForCourse(found!.id, cid);
+          });
+        }
+      }
+      return found;
+    }
 
     // Fallback: search by user email
     const users = db.getUsers();
@@ -562,6 +600,15 @@ export const db = {
       found = students.find(s => s.email.toLowerCase() === user.email.toLowerCase());
       if (found) {
         found.userId = user.id;
+        if (lecturerTakenIds.length > 0) {
+          const missing = lecturerTakenIds.filter(cid => !found!.enrolledCourseIds.includes(cid));
+          if (missing.length > 0) {
+            found.enrolledCourseIds = Array.from(new Set([...found.enrolledCourseIds, ...missing]));
+            missing.forEach(cid => {
+              db.registerStudentForCourse(found!.id, cid);
+            });
+          }
+        }
         saveItem(STORAGE_KEYS.STUDENTS, students);
         return found;
       }
@@ -569,6 +616,8 @@ export const db = {
       // If user is a student, automatically construct & persist a complete StudentProfile
       if (user.role === 'student') {
         const defaultCourses = db.getMatchingCoursesForStudent('Computer Science', 'HND II');
+        const enrolledCourses = Array.from(new Set([...defaultCourses, ...lecturerTakenIds]));
+
         const newStudent: StudentProfile = {
           id: `student_${user.id}`,
           userId: user.id,
@@ -582,7 +631,7 @@ export const db = {
           academicSession: '2025/2026',
           phone: user.phone || '+234 800 000 0000',
           status: 'active',
-          enrolledCourseIds: defaultCourses,
+          enrolledCourseIds: enrolledCourses,
           avatarUrl: user.avatarUrl,
         };
 
@@ -591,7 +640,7 @@ export const db = {
         syncToFirestore('students', newStudent.id, newStudent);
 
         // Auto-register courses
-        defaultCourses.forEach(cid => {
+        enrolledCourses.forEach(cid => {
           db.registerStudentForCourse(newStudent.id, cid);
         });
 
@@ -623,9 +672,12 @@ export const db = {
     }
 
     const students = db.getStudents();
-    const enrolledCourses = profileData.enrolledCourseIds && profileData.enrolledCourseIds.length > 0
+    const baseCourses = profileData.enrolledCourseIds && profileData.enrolledCourseIds.length > 0
       ? profileData.enrolledCourseIds
       : db.getMatchingCoursesForStudent(profileData.department, profileData.level);
+
+    const lecturerTakenIds = db.getLecturerTakenCourseIds();
+    const enrolledCourses = Array.from(new Set([...baseCourses, ...lecturerTakenIds]));
 
     const newStudent: StudentProfile = {
       ...profileData,
@@ -787,7 +839,7 @@ export const db = {
     saveItem(STORAGE_KEYS.LECTURERS, lecturers);
     syncToFirestore('lecturers', newLecturer.id, newLecturer);
 
-    // Update the courses to reflect the assigned lecturer
+    // Update the courses to reflect the assigned lecturer and auto-enroll existing students
     if (newLecturer.assignedCourseIds && newLecturer.assignedCourseIds.length > 0) {
       const fullTitleName = `${newLecturer.title} ${newLecturer.name}`;
       newLecturer.assignedCourseIds.forEach(courseId => {
@@ -796,6 +848,27 @@ export const db = {
           lecturerName: fullTitleName 
         });
       });
+
+      const allStudents = db.getStudents();
+      let studentsChanged = false;
+      allStudents.forEach(s => {
+        let studentUpdated = false;
+        newLecturer.assignedCourseIds.forEach(cid => {
+          if (!s.enrolledCourseIds.includes(cid)) {
+            s.enrolledCourseIds.push(cid);
+            studentUpdated = true;
+            db.registerStudentForCourse(s.id, cid);
+          }
+        });
+        if (studentUpdated) {
+          studentsChanged = true;
+          syncToFirestore('students', s.id, s);
+        }
+      });
+      if (studentsChanged) {
+        saveItem(STORAGE_KEYS.STUDENTS, allStudents);
+        dbEvents.emit('students_updated', allStudents);
+      }
     }
 
     db.addAuditLog('Lecturer Created', `New lecturer added: ${newLecturer.title} ${newLecturer.name} (${newLecturer.staffId}).`, 'Administrator');
@@ -914,31 +987,10 @@ export const db = {
   getCoursesByLecturer: (lecturerId: string): Course[] => {
     const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
     const possibleIds = new Set([lecturerId, lecturer?.id, lecturer?.userId].filter(Boolean));
-    const allCourses = db.getCourses();
-
-    return allCourses.filter(c => {
-      // 1. Direct lecturerId match
-      if (possibleIds.has(c.lecturerId)) return true;
-
-      // 2. Course ID listed in assignedCourseIds
-      if (lecturer?.assignedCourseIds && lecturer.assignedCourseIds.includes(c.id)) return true;
-
-      // 3. Department & Level match if lecturer has levelsTaking
-      if (lecturer && lecturer.levelsTaking && lecturer.levelsTaking.length > 0) {
-        const lecturerLevels = lecturer.levelsTaking.map(normalizeLevel);
-        const courseLevel = normalizeLevel(c.level);
-        const deptMatch = !c.department || !lecturer.department || c.department.trim().toLowerCase() === lecturer.department.trim().toLowerCase();
-        if (deptMatch && lecturerLevels.includes(courseLevel)) return true;
-      }
-
-      // 4. Default fallback for lecturers in Computer Science if no courses are explicitly assigned
-      if (lecturer && (!lecturer.assignedCourseIds || lecturer.assignedCourseIds.length === 0) && (!c.lecturerId || c.lecturerId === '')) {
-        const deptMatch = !c.department || !lecturer.department || c.department.trim().toLowerCase() === lecturer.department.trim().toLowerCase();
-        if (deptMatch) return true;
-      }
-
-      return false;
-    });
+    return db.getCourses().filter(c => 
+      possibleIds.has(c.lecturerId) || 
+      (lecturer?.assignedCourseIds && lecturer.assignedCourseIds.includes(c.id))
+    );
   },
   getCoursesByDepartment: (department: string): Course[] => {
     return db.getCourses().filter(c => c.department.toLowerCase() === department.toLowerCase());
@@ -1031,7 +1083,7 @@ export const db = {
     const courses = db.getCourses();
     const validCourseIds = new Set(courses.map(c => c.id));
     const students = db.getStudents();
-    const validStudentIds = new Set(students.flatMap(s => [s.id, s.userId].filter(Boolean)));
+    const validStudentIds = new Set(students.map(s => s.id));
 
     // Filter out orphan registrations pointing to deleted courses or non-existent students
     const validRegs = regs.filter(r => validCourseIds.has(r.courseId) && validStudentIds.has(r.studentId));
@@ -1765,6 +1817,30 @@ export const db = {
       })
     ]).catch(err => console.warn("Background lecturer sync note:", err));
 
+    // Auto-enroll all existing students in the lecturer's assigned courses
+    if (assignedCourses.length > 0) {
+      const allStudents = db.getStudents();
+      let studentsChanged = false;
+      allStudents.forEach(s => {
+        let studentUpdated = false;
+        assignedCourses.forEach(cid => {
+          if (!s.enrolledCourseIds.includes(cid)) {
+            s.enrolledCourseIds.push(cid);
+            studentUpdated = true;
+            db.registerStudentForCourse(s.id, cid);
+          }
+        });
+        if (studentUpdated) {
+          studentsChanged = true;
+          syncToFirestore('students', s.id, s);
+        }
+      });
+      if (studentsChanged) {
+        saveItem(STORAGE_KEYS.STUDENTS, allStudents);
+        dbEvents.emit('students_updated', allStudents);
+      }
+    }
+
     db.addAuditLog('Lecturer Registered', `New academic staff registered: ${fullTitleName} (${newLecturer.staffId}).`, 'System');
     dbEvents.emit('users_updated', users);
     dbEvents.emit('lecturers_updated', lecturers);
@@ -1885,14 +1961,8 @@ export const db = {
   },
 
   getLecturerAttendanceStats: (lecturerId: string) => {
-    const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
     const courses = db.getCoursesByLecturer(lecturerId);
     const courseIds = new Set(courses.map(c => c.id));
-    const courseLevels = new Set(courses.map(c => normalizeLevel(c.level)));
-    if (lecturer?.levelsTaking) {
-      lecturer.levelsTaking.forEach(l => courseLevels.add(normalizeLevel(l)));
-    }
-
     const sessions = db.getSessions().filter(s => courseIds.has(s.courseId));
     const records = db.getRecords().filter(r => courseIds.has(r.courseId) && r.status === 'PRESENT');
     const now = Date.now();
@@ -1910,29 +1980,14 @@ export const db = {
       }
     });
 
-    // 2. Student profile enrolledCourseIds or level match
-    const lecturerDept = (lecturer?.department || 'Computer Science').trim().toLowerCase();
+    // 2. Student profile enrolledCourseIds (with auto-sync)
     activeStudents.forEach(s => {
       const enrolled = s.enrolledCourseIds || [];
-      const studentDept = (s.department || 'Computer Science').trim().toLowerCase();
-      const studentNormLevel = normalizeLevel(s.level);
-
-      const hasDirectCourseMatch = enrolled.some(cid => courseIds.has(cid));
-      const hasLevelMatch = (studentDept === lecturerDept || !lecturerDept) && courseLevels.has(studentNormLevel);
-
-      if (hasDirectCourseMatch || hasLevelMatch) {
+      if (enrolled.some(cid => courseIds.has(cid))) {
         registeredStudentIds.add(s.id);
-
-        // Auto-heal / sync missing registrations and enrolledCourseIds
-        courses.forEach(c => {
-          if (normalizeLevel(c.level) === studentNormLevel || hasDirectCourseMatch) {
-            if (!enrolled.includes(c.id)) {
-              s.enrolledCourseIds = [...enrolled, c.id];
-              db.updateStudent(s.id, { enrolledCourseIds: s.enrolledCourseIds });
-            }
-            if (!db.isStudentRegisteredForCourse(s.id, c.id)) {
-              db.registerStudentForCourse(s.id, c.id);
-            }
+        enrolled.forEach(cid => {
+          if (courseIds.has(cid) && !db.isStudentRegisteredForCourse(s.id, cid)) {
+            db.registerStudentForCourse(s.id, cid);
           }
         });
       }
