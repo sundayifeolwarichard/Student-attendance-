@@ -112,8 +112,6 @@ export const LecturerDashboard: React.FC<LecturerDashboardProps> = ({
     const unsub3 = dbEvents.on('attendance_recorded', loadData);
     const unsub4 = dbEvents.on('courses_updated', loadData);
     const unsub5 = dbEvents.on('lecturers_updated', loadData);
-    const unsub6 = dbEvents.on('students_updated', loadData);
-    const unsub7 = dbEvents.on('registrations_updated', loadData);
     const interval = setInterval(loadData, 4000);
     return () => {
       unsub1();
@@ -121,8 +119,6 @@ export const LecturerDashboard: React.FC<LecturerDashboardProps> = ({
       unsub3();
       unsub4();
       unsub5();
-      unsub6();
-      unsub7();
       clearInterval(interval);
     };
   }, [user.id]);
