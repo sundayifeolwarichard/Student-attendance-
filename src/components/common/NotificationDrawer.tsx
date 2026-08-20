@@ -61,7 +61,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleMarkAllRead = () => {
-    db.markAllNotificationsRead(uid);
+    db.markAllNotificationsRead(uid, currentUser?.role);
   };
 
   const handleItemClick = (notif: AppNotification) => {

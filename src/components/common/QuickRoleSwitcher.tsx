@@ -23,7 +23,7 @@ export const QuickRoleSwitcher: React.FC<QuickRoleSwitcherProps> = ({
     setUsers(db.getUsers());
   }, []);
 
-  const student = users.find(u => u.role === 'student' && u.email.includes('john.adewale')) || users.find(u => u.role === 'student');
+  const student = users.find(u => u.role === 'student');
   const allLecturers = users.filter(u => u.role === 'lecturer');
   const lecturer = allLecturers.find(u => u.id === activeId) || allLecturers[0];
   const admin = users.find(u => u.role === 'admin');

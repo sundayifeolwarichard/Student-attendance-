@@ -114,15 +114,18 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.warn("Firebase signout warning:", err);
-    }
+  const handleLogout = () => {
+    // 1. Immediately reset active user state for instantaneous UI response
     db.setActiveUserId(null);
     setCurrentUser(null);
     setCurrentView('landing');
+    setSelectedCourseForSession(null);
+    setActiveSessionPayload(null);
+
+    // 2. Asynchronously complete Firebase signout in background
+    signOut(auth).catch((err) => {
+      console.warn("Background Firebase signout warning:", err);
+    });
   };
 
   const handleStartSessionForCourse = (course: Course) => {

@@ -366,7 +366,7 @@ export const db = {
     saveItem(STORAGE_KEYS.RECORDS, INITIAL_RECORDS);
     saveItem(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     saveItem(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
-    saveItem(STORAGE_KEYS.ACTIVE_USER_ID, 'user_student_1');
+    saveItem(STORAGE_KEYS.ACTIVE_USER_ID, '');
 
     // Sync seed data to Firestore
     try {
@@ -421,7 +421,7 @@ export const db = {
     return db.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
   },
   getActiveUserId: (): string => {
-    return loadItem<string>(STORAGE_KEYS.ACTIVE_USER_ID, 'user_student_1');
+    return loadItem<string>(STORAGE_KEYS.ACTIVE_USER_ID, '');
   },
   getActiveUser: (): User | null => {
     const activeId = db.getActiveUserId();
@@ -1046,6 +1046,16 @@ export const db = {
       message: `${lecturer.title} ${lecturer.name} just started an attendance session for ${course.code} (${course.title}). Open your scanner now!`,
       type: 'info',
       link: '/student/scan',
+    });
+
+    // Notify hosting lecturer specifically
+    db.createNotification({
+      userId: lecturer.userId,
+      role: 'lecturer',
+      title: `Session Live: ${course.code}`,
+      message: `Your live session for ${course.code} (${course.title}) has started and is active.`,
+      type: 'info',
+      link: '/lecturer/session',
     });
 
     db.addAuditLog('Attendance Started', `Lecturer ${lecturer.title} ${lecturer.name} started attendance for ${course.code} (${params.durationMinutes} mins).`, 'Lecturer');
@@ -1775,12 +1785,19 @@ export const db = {
     const allNotifs = loadItem<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     let filtered = allNotifs;
     if (userId || role) {
-      filtered = allNotifs.filter(n => 
-        n.userId === userId || 
-        n.userId === 'all' || 
-        n.role === 'all' || 
-        (role && n.role === role)
-      );
+      filtered = allNotifs.filter(n => {
+        // 1. Strict Role Boundary: if notification specifies a role, user role MUST match
+        if (n.role && n.role !== 'all' && role && n.role !== role) {
+          return false;
+        }
+
+        // 2. Strict User Account Boundary: if notification is assigned to a specific userId, user ID MUST match
+        if (n.userId && n.userId !== 'all') {
+          return n.userId === userId;
+        }
+
+        return true;
+      });
     }
 
     // Sort by timestamp descending (newest first)
@@ -1826,10 +1843,12 @@ export const db = {
       dbEvents.emit('notifications_updated');
     }
   },
-  markAllNotificationsRead: (userId?: string): void => {
+  markAllNotificationsRead: (userId?: string, role?: string): void => {
     const notifs = loadItem<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     notifs.forEach(n => {
-      if (!userId || n.userId === userId || n.userId === 'all') {
+      const matchesRole = !n.role || n.role === 'all' || (role && n.role === role);
+      const matchesUser = !n.userId || n.userId === 'all' || (userId && n.userId === userId);
+      if (matchesRole && matchesUser) {
         n.read = true;
         syncToFirestore('notifications', n.id, { read: true });
       }

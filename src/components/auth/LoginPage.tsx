@@ -102,23 +102,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     lecturerLevels.length === 0 || lecturerLevels.includes(c.level)
   );
 
-  // Quick autofill demo accounts
-  const autofillDemo = (role: UserRole) => {
-    setError(null);
-    setSelectedRole(role);
-    setIsRegistering(false);
-    if (role === 'student') {
-      setEmail('john.adewale@student.polyibadan.edu.ng');
-      setPassword('password123');
-    } else if (role === 'lecturer') {
-      setEmail('demo.lecturer@staff.polyibadan.edu.ng');
-      setPassword('password123');
-    } else if (role === 'admin') {
-      setEmail('admin@polyibadan.edu.ng');
-      setPassword('password123');
-    }
-  };
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -126,7 +109,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setError(null);
     setSuccessMessage(null);
 
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
 
     if (!trimmedEmail || !trimmedPassword) {
@@ -134,52 +117,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       let user = db.getUserByEmail(trimmedEmail);
 
+      // Check if user entered matric number or staff ID instead of email
       if (!user) {
-        // Instant guest/demo fallback user creation so user never waits
-        user = {
-          id: `user_${Date.now()}`,
-          name: trimmedEmail.split('@')[0],
-          email: trimmedEmail.toLowerCase(),
-          role: selectedRole,
-          status: 'active',
-          createdAt: new Date().toISOString()
-        };
-        if (selectedRole === 'student') {
-          await db.registerStudentAsync({
-            userId: user.id,
-            name: user.name,
-            email: user.email,
-            matricNumber: 'ND/CS/25/' + Math.floor(100 + Math.random() * 900),
-            level: 'HND II',
-          }, trimmedPassword);
-        } else if (selectedRole === 'lecturer') {
-          await db.registerLecturerAsync({
-            userId: user.id,
-            name: 'Dr. ' + user.name,
-            email: user.email,
-            staffId: 'TPI/ST/2026/' + Math.floor(100 + Math.random() * 900),
-          }, trimmedPassword);
+        const studentByMatric = db.getStudentByMatric(trimmedEmail);
+        if (studentByMatric) {
+          user = db.getUserById(studentByMatric.userId);
+        } else {
+          const lecturerByStaff = db.getLecturers().find(l => l.staffId.toUpperCase() === trimmedEmail.toUpperCase());
+          if (lecturerByStaff) {
+            user = db.getUserById(lecturerByStaff.userId);
+          }
         }
       }
 
+      // STRICT CHECK: Unregistered users CANNOT log in!
+      if (!user) {
+        setIsSubmitting(false);
+        setError('Account not found in official register. You must register your account first before logging in.');
+        return;
+      }
+
       if (user.role !== selectedRole) {
-        setError(`This account is registered as a ${user.role}. Please select the ${user.role} tab above.`);
+        setIsSubmitting(false);
+        setError(`This account is registered as a ${user.role.toUpperCase()}. Please select the ${user.role} tab above.`);
         return;
       }
 
       if (user.status === 'suspended') {
+        setIsSubmitting(false);
         setError('Your account has been suspended. Please contact the administrator.');
         return;
       }
 
-      // Navigate home IMMEDIATELY (0 delay)
       db.setActiveUserId(user.id);
       onLoginSuccess(user.id);
 
-      // Background cloud auth and sync
       setTimeout(() => {
         signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword).catch(() => {});
         db.syncToFirestore('users', user.id, user);
@@ -187,6 +164,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     } catch (err: any) {
       console.error("Login error:", err);
       setError(err.message || 'Login failed.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -388,9 +367,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     onChange={e => setEmail(e.target.value)}
                     placeholder={
                       selectedRole === 'student'
-                        ? 'e.g. john.adewale@student.polyibadan.edu.ng'
+                        ? 'e.g. student@student.polyibadan.edu.ng'
                         : selectedRole === 'lecturer'
-                        ? 'e.g. demo.lecturer@staff.polyibadan.edu.ng'
+                        ? 'e.g. lecturer@staff.polyibadan.edu.ng'
                         : 'e.g. admin@polyibadan.edu.ng'
                     }
                     className="block w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-slate-900 placeholder:text-slate-400"
@@ -458,19 +437,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <span>Sign In as {selectedRole.toUpperCase()}</span>
                 )}
               </button>
-
-              {/* Demo autofill button */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  id="autofill-demo-btn"
-                  onClick={() => autofillDemo(selectedRole)}
-                  className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-slate-900" />
-                  <span>Autofill Verified {selectedRole} Credentials</span>
-                </button>
-              </div>
 
               {/* Toggle to student registration / lecturer registration */}
               {selectedRole === 'student' && (
@@ -783,7 +749,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         required
                         value={matricNumber}
                         onChange={e => setMatricNumber(e.target.value)}
-                        placeholder="HND/CS/24/001"
                         className="block w-full px-3 py-2 text-xs font-mono uppercase border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-slate-900"
                       />
                     </div>
