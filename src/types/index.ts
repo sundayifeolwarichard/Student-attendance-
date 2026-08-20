@@ -133,6 +133,7 @@ export interface AppNotification {
   read: boolean;
   timestamp: string;
   link?: string;
+  level?: string;
 }
 
 export interface AuditLog {

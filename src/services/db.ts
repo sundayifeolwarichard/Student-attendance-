@@ -1149,6 +1149,7 @@ export const db = {
           message: `${course.code} (${course.title}) attendance is active for the next ${params.durationMinutes} minutes. Open your scanner now!`,
           type: 'info',
           link: '/student/scan',
+          level: course.level,
         });
       }
     });
@@ -1161,6 +1162,7 @@ export const db = {
       message: `${lecturer.title} ${lecturer.name} just started an attendance session for ${course.code} (${course.title}). Open your scanner now!`,
       type: 'info',
       link: '/student/scan',
+      level: course.level,
     });
 
     // Notify hosting lecturer specifically
@@ -1938,6 +1940,15 @@ export const db = {
     const allNotifs = loadItem<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     let filtered = allNotifs;
     if (userId || role) {
+      let studentLevel: string | undefined = undefined;
+      if (role === 'student' && userId) {
+        const students = db.getStudents();
+        const student = students.find(s => s.userId === userId || s.id === userId);
+        if (student) {
+          studentLevel = student.level;
+        }
+      }
+
       filtered = allNotifs.filter(n => {
         // 1. Strict Role Boundary: if notification specifies a role, user role MUST match
         if (n.role && n.role !== 'all' && role && n.role !== role) {
@@ -1947,6 +1958,13 @@ export const db = {
         // 2. Strict User Account Boundary: if notification is assigned to a specific userId, user ID MUST match
         if (n.userId && n.userId !== 'all') {
           return n.userId === userId;
+        }
+
+        // 3. Level filtering for student broadcast notifications
+        if (role === 'student' && studentLevel) {
+          if (n.level && n.level !== 'all' && n.level.trim() !== '') {
+            return n.level.trim().toLowerCase() === studentLevel.trim().toLowerCase();
+          }
         }
 
         return true;
@@ -1998,13 +2016,35 @@ export const db = {
   },
   markAllNotificationsRead: (userId?: string, role?: string): void => {
     const notifs = loadItem<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+    let studentLevel: string | undefined = undefined;
+    if (role === 'student' && userId) {
+      const students = db.getStudents();
+      const student = students.find(s => s.userId === userId || s.id === userId);
+      if (student) {
+        studentLevel = student.level;
+      }
+    }
+
     notifs.forEach(n => {
       const matchesRole = !n.role || n.role === 'all' || (role && n.role === role);
-      const matchesUser = !n.userId || n.userId === 'all' || (userId && n.userId === userId);
-      if (matchesRole && matchesUser) {
-        n.read = true;
-        syncToFirestore('notifications', n.id, { read: true });
+      if (!matchesRole) return;
+
+      if (n.userId && n.userId !== 'all') {
+        if (n.userId === userId) {
+          n.read = true;
+          syncToFirestore('notifications', n.id, { read: true });
+        }
+        return;
       }
+
+      if (role === 'student' && studentLevel && n.level && n.level !== 'all' && n.level.trim() !== '') {
+        if (n.level.trim().toLowerCase() !== studentLevel.trim().toLowerCase()) {
+          return;
+        }
+      }
+
+      n.read = true;
+      syncToFirestore('notifications', n.id, { read: true });
     });
     saveItem(STORAGE_KEYS.NOTIFICATIONS, notifs);
     dbEvents.emit('notifications_updated');
