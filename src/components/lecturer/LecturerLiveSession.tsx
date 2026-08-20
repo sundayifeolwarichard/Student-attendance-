@@ -122,13 +122,13 @@ export const LecturerLiveSession: React.FC<LecturerLiveSessionProps> = ({
 
   // Check if active session already exists for selected course
   useEffect(() => {
-    if (selectedCourseId && !session) {
-      const active = db.getActiveSessionForCourse(selectedCourseId);
+    if (selectedCourseId && !session && lecturer) {
+      const active = db.getActiveSessionForCourse(selectedCourseId, lecturer.id);
       if (active) {
         setSession(active);
       }
     }
-  }, [selectedCourseId]);
+  }, [selectedCourseId, lecturer]);
 
   // Sync session records
   const refreshSessionData = () => {

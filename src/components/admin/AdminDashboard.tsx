@@ -105,10 +105,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
 
   const loadData = () => {
     setStats(db.getAdminDashboardStats());
-    // Sync in background quietly
-    db.initializeFromFirestore().then(() => {
-      setStats(db.getAdminDashboardStats());
-    }).catch(() => {});
   };
 
   useEffect(() => {

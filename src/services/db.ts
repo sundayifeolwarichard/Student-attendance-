@@ -38,6 +38,8 @@ import {
 } from 'firebase/firestore';
 import { formatWATTime, formatWATDate, getWATDateString, getWATDate } from '../utils/time';
 
+let activeRealtimeUnsubscribes: (() => void)[] = [];
+
 const STORAGE_KEYS = {
   SETTINGS: 'tpi_attendance_settings',
   USERS: 'tpi_attendance_users',
@@ -243,31 +245,61 @@ export const db = {
   // Start real-time Firestore listeners for instant admin dashboard sync across all devices
   startRealtimeListeners: () => {
     if (!firestore) return;
+    // Prevent duplicate listeners/subscriptions by cleaning up existing ones first
+    activeRealtimeUnsubscribes.forEach(unsub => unsub());
+    activeRealtimeUnsubscribes = [];
+
     const collectionsToListen = [
       { col: 'students', key: STORAGE_KEYS.STUDENTS, event: 'students_updated', fallback: INITIAL_STUDENTS },
       { col: 'lecturers', key: STORAGE_KEYS.LECTURERS, event: 'lecturers_updated', fallback: INITIAL_LECTURERS },
       { col: 'users', key: STORAGE_KEYS.USERS, event: 'users_updated', fallback: INITIAL_USERS },
-      { col: 'records', key: STORAGE_KEYS.RECORDS, event: 'records_updated', fallback: INITIAL_RECORDS },
+      { col: 'departments', key: STORAGE_KEYS.DEPARTMENTS, event: 'departments_updated', fallback: INITIAL_DEPARTMENTS },
+      { col: 'courses', key: STORAGE_KEYS.COURSES, event: 'courses_updated', fallback: INITIAL_COURSES },
+      { col: 'registrations', key: STORAGE_KEYS.REGISTRATIONS, event: 'registrations_updated', fallback: INITIAL_REGISTRATIONS },
       { col: 'sessions', key: STORAGE_KEYS.SESSIONS, event: 'sessions_updated', fallback: INITIAL_SESSIONS },
+      { col: 'records', key: STORAGE_KEYS.RECORDS, event: 'records_updated', fallback: INITIAL_RECORDS },
+      { col: 'notifications', key: STORAGE_KEYS.NOTIFICATIONS, event: 'notifications_updated', fallback: INITIAL_NOTIFICATIONS },
+      { col: 'audit_logs', key: STORAGE_KEYS.AUDIT_LOGS, event: 'audit_logs_updated', fallback: INITIAL_AUDIT_LOGS },
     ];
 
     collectionsToListen.forEach(item => {
       try {
-        onSnapshot(collection(firestore, item.col), (snapshot) => {
+        const unsub = onSnapshot(collection(firestore, item.col), (snapshot) => {
+          console.log(`[Realtime] Snapshot received for collection '${item.col}': size=${snapshot.size}, empty=${snapshot.empty}, fromCache=${snapshot.metadata.fromCache}, hasPendingWrites=${snapshot.metadata.hasPendingWrites}`);
           if (!snapshot.empty) {
             const docsData: any[] = [];
             snapshot.forEach(doc => docsData.push(doc.data()));
+            console.log(`[Realtime] Saving ${docsData.length} records for '${item.col}' (event: ${item.event})`);
             saveItem(item.key, docsData);
             dbEvents.emit(item.event, docsData);
           } else {
+            // Guard against temporary/cached empty snapshot wiping out valid local data
+            const existing = loadItem<any[]>(item.key, item.fallback);
+            console.log(`[Realtime] Empty snapshot for '${item.col}'. Existing local count: ${existing.length}, fromCache: ${snapshot.metadata.fromCache}`);
+            if (snapshot.metadata.fromCache && existing.length > 0) {
+              console.log(`[Realtime] Ignoring cached empty snapshot for '${item.col}' to preserve ${existing.length} local records.`);
+              return;
+            }
+            if (existing.length > 0) {
+              console.log(`[Realtime] Preserving ${existing.length} local records for '${item.col}' despite empty remote snapshot.`);
+              return;
+            }
             saveItem(item.key, []);
             dbEvents.emit(item.event, []);
           }
-        }, () => {});
+        }, (error) => {
+          console.warn(`[Realtime] Listener error on '${item.col}':`, error);
+        });
+        activeRealtimeUnsubscribes.push(unsub);
       } catch (e) {
-        // ignore
+        console.warn(`Failed to attach listener for ${item.col}:`, e);
       }
     });
+  },
+
+  stopRealtimeListeners: () => {
+    activeRealtimeUnsubscribes.forEach(unsub => unsub());
+    activeRealtimeUnsubscribes = [];
   },
 
   // Sync all data from Firestore to localStorage for cross-browser synchronization
@@ -329,13 +361,21 @@ export const db = {
             querySnapshot.forEach((doc) => {
               docsData.push(doc.data());
             });
+            console.log(`[FirestoreInit] Synced ${docsData.length} records for collection '${item.col}'`);
             saveItem(item.key, docsData);
             didFetchAny = true;
           } else {
+            const existing = loadItem<any[]>(item.key, item.fallback);
+            console.log(`[FirestoreInit] Empty remote snapshot for '${item.col}'. Existing local count: ${existing.length}`);
+            if (existing.length > 0) {
+              console.log(`[FirestoreInit] Preserving ${existing.length} local records for '${item.col}' because remote snapshot was empty.`);
+              didFetchAny = true;
+              continue;
+            }
             saveItem(item.key, []);
           }
         } catch (e) {
-          console.warn(`Failed to sync collection ${item.col}:`, e);
+          console.warn(`[FirestoreInit] Failed to sync collection '${item.col}':`, e);
         }
       }
 
@@ -673,7 +713,8 @@ export const db = {
 
       if (user.role === 'lecturer') {
         const allCourses = db.getCourses();
-        const defaultCourseIds = allCourses.slice(0, 2).map(c => c.id);
+        const createdCourses = allCourses.filter(c => c.lecturerId === user.id || c.lecturerId === `lecturer_${user.id}`);
+        const defaultCourseIds = createdCourses.map(c => c.id);
         const newLecturer: LecturerProfile = {
           id: `lecturer_${user.id}`,
           userId: user.id,
@@ -870,7 +911,9 @@ export const db = {
     return db.getCourses().find(c => (c.code || '').replace(/\s+/g, '').toUpperCase() === code.replace(/\s+/g, '').toUpperCase());
   },
   getCoursesByLecturer: (lecturerId: string): Course[] => {
-    return db.getCourses().filter(c => c.lecturerId === lecturerId);
+    const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
+    const assignedIds = lecturer?.assignedCourseIds || [];
+    return db.getCourses().filter(c => assignedIds.includes(c.id));
   },
   getCoursesByDepartment: (department: string): Course[] => {
     if (!department) return [];
@@ -979,7 +1022,27 @@ export const db = {
     return validRegs;
   },
   getStudentRegistrations: (studentId: string): CourseRegistration[] => {
-    return db.getRegistrations().filter(r => r.studentId === studentId);
+    const regs = db.getRegistrations().filter(r => r.studentId === studentId);
+    const student = db.getStudentById(studentId);
+    if (student && student.enrolledCourseIds && student.enrolledCourseIds.length > 0) {
+      const existingCourseIds = new Set(regs.map(r => r.courseId));
+      student.enrolledCourseIds.forEach(cid => {
+        if (!existingCourseIds.has(cid)) {
+          const course = db.getCourseById(cid);
+          regs.push({
+            id: `reg_auto_${studentId}_${cid}`,
+            studentId: student.id,
+            matricNumber: student.matricNumber,
+            courseId: cid,
+            courseCode: course?.code || 'CSC 401',
+            academicSession: course?.academicSession || student.academicSession || '2025/2026',
+            semester: course?.semester || 'First Semester',
+            registeredAt: new Date().toISOString(),
+          });
+        }
+      });
+    }
+    return regs;
   },
   getCourseRegistrations: (courseId: string): CourseRegistration[] => {
     const validRegs = db.getRegistrations().filter(r => r.courseId === courseId);
@@ -1077,9 +1140,47 @@ export const db = {
     const now = Date.now();
     return db.getSessions().filter(s => s.status === 'active' && s.expirationTime > now);
   },
-  getActiveSessionForCourse: (courseId: string): AttendanceSession | undefined => {
+  getActiveSessionsByLecturer: (lecturerId: string): AttendanceSession[] => {
+    const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
+    const lecId = lecturer?.id;
+    const userId = lecturer?.userId;
     const now = Date.now();
-    return db.getSessions().find(s => s.courseId === courseId && s.status === 'active' && s.expirationTime > now);
+    return db.getSessions().filter(s => {
+      const isLecturer =
+        (lecId && s.lecturerId === lecId) ||
+        (userId && s.lecturerId === userId) ||
+        (lecturerId && s.lecturerId === lecturerId);
+      return isLecturer && s.status === 'active' && s.expirationTime > now;
+    });
+  },
+  getSessionsByLecturer: (lecturerId: string): AttendanceSession[] => {
+    const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
+    const lecId = lecturer?.id;
+    const userId = lecturer?.userId;
+    const courses = db.getCoursesByLecturer(lecturerId);
+    const courseIds = new Set(courses.map(c => c.id));
+
+    return db.getSessions().filter(s => {
+      const isLecturer =
+        (lecId && s.lecturerId === lecId) ||
+        (userId && s.lecturerId === userId) ||
+        (lecturerId && s.lecturerId === lecturerId);
+      return isLecturer && courseIds.has(s.courseId);
+    });
+  },
+  getActiveSessionForCourse: (courseId: string, lecturerId?: string): AttendanceSession | undefined => {
+    const now = Date.now();
+    return db.getSessions().find(s => {
+      const isCourseMatch = s.courseId === courseId && s.status === 'active' && s.expirationTime > now;
+      if (!isCourseMatch) return false;
+      if (lecturerId) {
+        const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
+        const lecId = lecturer?.id;
+        const userId = lecturer?.userId;
+        return s.lecturerId === lecturerId || (lecId && s.lecturerId === lecId) || (userId && s.lecturerId === userId);
+      }
+      return true;
+    });
   },
   createSession: (params: {
     courseId: string;
@@ -1088,13 +1189,13 @@ export const db = {
     requiresLocation?: boolean;
   }): AttendanceSession => {
     const course = db.getCourseById(params.courseId);
-    const lecturer = db.getLecturerById(params.lecturerId);
+    const lecturer = db.getLecturerById(params.lecturerId) || db.getLecturerByUserId(params.lecturerId);
     if (!course || !lecturer) {
       throw new Error('Course or Lecturer not found');
     }
 
-    // Auto-close any previous active session for this course
-    const activeOld = db.getActiveSessionForCourse(params.courseId);
+    // Auto-close any previous active session for this course started by this lecturer
+    const activeOld = db.getActiveSessionForCourse(params.courseId, lecturer.id);
     if (activeOld) {
       db.closeSession(activeOld.id);
     }
@@ -1821,12 +1922,13 @@ export const db = {
 
   getLecturerAttendanceStats: (lecturerId: string) => {
     const courses = db.getCoursesByLecturer(lecturerId);
-    const courseIds = new Set(courses.map(c => c.id));
-    const sessions = db.getSessions().filter(s => courseIds.has(s.courseId));
-    const records = db.getRecords().filter(r => courseIds.has(r.courseId) && r.status === 'PRESENT');
+    const sessions = db.getSessionsByLecturer(lecturerId);
+    const sessionIds = new Set(sessions.map(s => s.id));
+    const records = db.getRecords().filter(r => sessionIds.has(r.sessionId) && r.status === 'PRESENT');
     const now = Date.now();
     const activeSessions = sessions.filter(s => s.status === 'active' && s.expirationTime > now);
     
+    const courseIds = new Set(courses.map(c => c.id));
     const allRegistrations = db.getRegistrations().filter(r => courseIds.has(r.courseId));
     const activeStudentIds = new Set(db.getStudents().map(s => s.id));
     const uniqueStudents = new Set(
@@ -1839,7 +1941,7 @@ export const db = {
     const totalPresent = records.length;
     const attendanceRate = totalPossibleAttendances > 0 
       ? Math.round((totalPresent / totalPossibleAttendances) * 100) 
-      : 88;
+      : 0;
 
     return {
       totalCourses: courses.length,

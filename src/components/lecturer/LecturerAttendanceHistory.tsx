@@ -35,9 +35,7 @@ export const LecturerAttendanceHistory: React.FC<LecturerAttendanceHistoryProps>
     const l = db.getLecturerByUserId(user.id);
     setLecturer(l || null);
     if (l) {
-      const courses = db.getCoursesByLecturer(l.id);
-      const cIds = new Set(courses.map(c => c.id));
-      const sList = db.getSessions().filter(s => cIds.has(s.courseId));
+      const sList = db.getSessionsByLecturer(l.id);
       setSessions(sList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     }
   };

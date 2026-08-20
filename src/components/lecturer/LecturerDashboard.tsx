@@ -100,7 +100,7 @@ export const LecturerDashboard: React.FC<LecturerDashboardProps> = ({
     if (l) {
       const s = db.getLecturerAttendanceStats(l.id);
       setStats(s);
-      const active = db.getActiveSessions().filter(sess => sess.lecturerId === l.id);
+      const active = db.getActiveSessionsByLecturer(l.id);
       setActiveSessions(active);
     }
   };

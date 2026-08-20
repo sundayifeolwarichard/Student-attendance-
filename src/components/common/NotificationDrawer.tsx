@@ -38,14 +38,31 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
           list = Array.isArray(rawNotifs) ? [...rawNotifs] : Array.from(rawNotifs as any);
         }
         
+        // Deduplicate and ensure all items have unique IDs
+        const seenIds = new Set<string>();
+        const uniqueList: AppNotification[] = [];
+        for (let i = 0; i < list.length; i++) {
+          const item = list[i];
+          if (!item) continue;
+          const id = item.id || `notif_${i}_${item.timestamp || Date.now()}`;
+          if (!seenIds.has(id)) {
+            seenIds.add(id);
+            uniqueList.push({ ...item, id });
+          } else {
+            const fallbackId = `${id}_${i}`;
+            seenIds.add(fallbackId);
+            uniqueList.push({ ...item, id: fallbackId });
+          }
+        }
+
         // Sort newest first
-        list.sort((a, b) => {
+        uniqueList.sort((a, b) => {
           const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
           const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
           return timeB - timeA;
         });
         
-        setNotifications(list);
+        setNotifications(uniqueList);
       }
     };
 
@@ -81,8 +98,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end animate-fade-in">
-      <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col transform transition-transform duration-300 border-l border-slate-200">
+    <div id="notification-drawer-backdrop" className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end animate-fade-in">
+      <div id="notification-drawer-panel" className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col transform transition-transform duration-300 border-l border-slate-200">
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2.5">
@@ -124,9 +141,10 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
               <p className="text-xs text-slate-400 mt-1">Updates on attendance and sessions will appear here.</p>
             </div>
           ) : (
-            notifications.map(notif => (
+            notifications.map((notif, idx) => (
               <div
-                key={notif.id}
+                key={notif.id || `notif_row_${idx}`}
+                id={`notification-item-${notif.id || idx}`}
                 onClick={() => handleItemClick(notif)}
                 className={`p-3.5 rounded-xl cursor-pointer transition-all border ${
                   notif.read
