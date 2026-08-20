@@ -45,7 +45,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       academicSession: '2025/2026',
       phone: user.phone || '+234 800 000 0000',
       status: 'active',
-      enrolledCourseIds: db.getCourses().map(c => c.id),
+      enrolledCourseIds: (() => {
+        const lvl = 'HND II';
+        const levelCourses = db.getCourses().filter(c => c.level === lvl);
+        return levelCourses.length > 0 ? levelCourses.map(c => c.id) : ['course_csc401', 'course_csc403'];
+      })(),
     };
   });
 

@@ -519,54 +519,38 @@ export const db = {
     let found = students.find(s => s.userId === userId || s.id === userId);
     if (found) return found;
 
-    // Fallback: search by user email
     const users = db.getUsers();
     const user = users.find(u => u.id === userId);
-    if (user) {
-      found = students.find(s => (s.email || '').toLowerCase() === (user.email || '').toLowerCase());
-      if (found) {
-        found.userId = user.id;
-        saveItem(STORAGE_KEYS.STUDENTS, students);
-        return found;
-      }
+    if (user && user.role === 'student') {
+      const studentLevel = 'HND II';
+      const levelCourses = db.getCourses().filter(c => c.level === studentLevel);
+      const defaultCourses = levelCourses.length > 0 ? levelCourses.map(c => c.id) : ['course_csc401', 'course_csc403'];
+      const newStudent: StudentProfile = {
+        id: `student_${user.id}`,
+        userId: user.id,
+        name: user.name || 'Student User',
+        email: user.email,
+        matricNumber: `ND/CS/25/${Math.floor(100 + Math.random() * 900)}`,
+        school: 'School of Science & Technology',
+        department: 'Computer Science',
+        programme: 'Higher National Diploma',
+        level: 'HND II',
+        academicSession: '2025/2026',
+        phone: user.phone || '+234 800 000 0000',
+        status: 'active',
+        enrolledCourseIds: defaultCourses,
+        avatarUrl: user.avatarUrl,
+      };
 
-      // If user is a student, automatically construct & persist a complete StudentProfile
-      if (user.role === 'student') {
-        const allCourses = db.getCourses();
-        const defaultCourses = allCourses.map(c => c.id);
-        const newStudent: StudentProfile = {
-          id: `student_${user.id}`,
-          userId: user.id,
-          name: user.name || 'Student User',
-          email: user.email,
-          matricNumber: `ND/CS/25/${Math.floor(100 + Math.random() * 900)}`,
-          school: 'School of Science & Technology',
-          department: 'Computer Science',
-          programme: 'Higher National Diploma',
-          level: 'HND II',
-          academicSession: '2025/2026',
-          phone: user.phone || '+234 800 000 0000',
-          status: 'active',
-          enrolledCourseIds: defaultCourses,
-          avatarUrl: user.avatarUrl,
-        };
+      students.push(newStudent);
+      saveItem(STORAGE_KEYS.STUDENTS, students);
+      syncToFirestore('students', newStudent.id, newStudent);
 
-        students.push(newStudent);
-        saveItem(STORAGE_KEYS.STUDENTS, students);
-        syncToFirestore('students', newStudent.id, newStudent);
+      defaultCourses.forEach(cid => {
+        db.registerStudentForCourse(newStudent.id, cid);
+      });
 
-        // Auto-register courses
-        defaultCourses.forEach(cid => {
-          db.registerStudentForCourse(newStudent.id, cid);
-        });
-
-        return newStudent;
-      }
-    }
-
-    // Secondary fallback: if students list is empty or any student exists
-    if (students.length > 0) {
-      return students[0];
+      return newStudent;
     }
 
     return undefined;
@@ -1597,7 +1581,7 @@ export const db = {
     };
 
     const students = db.getStudents();
-    const existingStudentIndex = students.findIndex(s => s.id === uid || s.userId === uid || s.email.toLowerCase() === newStudent.email.toLowerCase());
+    const existingStudentIndex = students.findIndex(s => s.id === uid || s.userId === uid);
     if (existingStudentIndex >= 0) {
       students[existingStudentIndex] = { ...students[existingStudentIndex], ...newStudent };
     } else {
