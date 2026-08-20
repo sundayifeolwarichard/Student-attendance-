@@ -242,13 +242,11 @@ export const db = {
           if (!snapshot.empty) {
             const docsData: any[] = [];
             snapshot.forEach(doc => docsData.push(doc.data()));
-            const existing = loadItem<any[]>(item.key, item.fallback);
-            const docMap = new Map();
-            existing.forEach(e => docMap.set(e.id || e.userId || JSON.stringify(e), e));
-            docsData.forEach(d => docMap.set(d.id || d.userId || JSON.stringify(d), d));
-            const merged = Array.from(docMap.values());
-            saveItem(item.key, merged);
-            dbEvents.emit(item.event, merged);
+            saveItem(item.key, docsData);
+            dbEvents.emit(item.event, docsData);
+          } else {
+            saveItem(item.key, []);
+            dbEvents.emit(item.event, []);
           }
         }, () => {});
       } catch (e) {
@@ -316,21 +314,10 @@ export const db = {
             querySnapshot.forEach((doc) => {
               docsData.push(doc.data());
             });
-            // Merge existing local with firestore documents
-            const existing = loadItem<any[]>(item.key, item.fallback);
-            const docMap = new Map();
-            existing.forEach(e => docMap.set(e.id || e.userId || JSON.stringify(e), e));
-            docsData.forEach(d => docMap.set(d.id || d.userId || JSON.stringify(d), d));
-            const merged = Array.from(docMap.values());
-            saveItem(item.key, merged);
+            saveItem(item.key, docsData);
             didFetchAny = true;
-          } else if (querySnapshot && querySnapshot.empty && item.fallback.length > 0) {
-            // Auto seed default data to firestore if collection is empty
-            for (const docItem of item.fallback) {
-              if (docItem.id) {
-                syncToFirestore(item.col, docItem.id, docItem);
-              }
-            }
+          } else {
+            saveItem(item.key, []);
           }
         } catch (e) {
           console.warn(`Failed to sync collection ${item.col}:`, e);
