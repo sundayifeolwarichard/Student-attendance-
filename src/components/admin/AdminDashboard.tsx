@@ -321,7 +321,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
       </div>
 
       {/* Admin Navigation Tabs */}
-      <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+      <div className="flex overflow-x-auto gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 scrollbar-none whitespace-nowrap sm:flex-wrap">
         {[
           { id: 'overview', label: 'System Overview', icon: Activity },
           { id: 'students', label: `Students (${stats.totalStudents})`, icon: GraduationCap },

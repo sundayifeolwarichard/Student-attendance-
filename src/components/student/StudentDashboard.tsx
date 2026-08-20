@@ -210,7 +210,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       )}
 
       {/* 4 Key Metric Cards Redesigned */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Courses */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
