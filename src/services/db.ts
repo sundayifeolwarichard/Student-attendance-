@@ -511,7 +511,33 @@ export const db = {
     return loadItem<StudentProfile[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
   },
   getStudentById: (id: string): StudentProfile | undefined => {
-    return db.getStudents().find(s => s.id === id);
+    return db.getStudents().find(s => s.id === id || s.userId === id);
+  },
+  getMatchingCoursesForStudent: (department?: string, level?: string): string[] => {
+    const allCourses = db.getCourses();
+    if (allCourses.length === 0) return [];
+
+    const targetDept = (department || 'Computer Science').trim().toLowerCase();
+    const targetLevel = (level || 'HND II').trim().toUpperCase();
+
+    const normalizeLevel = (l: string) => l.toUpperCase().replace(/\s+/g, '').replace('2', 'II').replace('1', 'I');
+    const normTargetLevel = normalizeLevel(targetLevel);
+
+    let matches = allCourses.filter(c => {
+      const deptMatch = c.department.trim().toLowerCase() === targetDept;
+      const levelMatch = normalizeLevel(c.level) === normTargetLevel;
+      return deptMatch && levelMatch;
+    });
+
+    if (matches.length === 0) {
+      matches = allCourses.filter(c => c.department.trim().toLowerCase() === targetDept);
+    }
+
+    if (matches.length === 0) {
+      matches = allCourses;
+    }
+
+    return matches.map(c => c.id);
   },
   getStudentByUserId: (userId: string): StudentProfile | undefined => {
     const students = db.getStudents();
@@ -531,8 +557,7 @@ export const db = {
 
       // If user is a student, automatically construct & persist a complete StudentProfile
       if (user.role === 'student') {
-        const allCourses = db.getCourses();
-        const defaultCourses = allCourses.map(c => c.id);
+        const defaultCourses = db.getMatchingCoursesForStudent('Computer Science', 'HND II');
         const newStudent: StudentProfile = {
           id: `student_${user.id}`,
           userId: user.id,
@@ -587,14 +612,9 @@ export const db = {
     }
 
     const students = db.getStudents();
-    const allCourses = db.getCourses();
-    const coursesForLevel = allCourses
-      .filter(c => c.level === profileData.level)
-      .map(c => c.id);
-
     const enrolledCourses = profileData.enrolledCourseIds && profileData.enrolledCourseIds.length > 0
       ? profileData.enrolledCourseIds
-      : coursesForLevel;
+      : db.getMatchingCoursesForStudent(profileData.department, profileData.level);
 
     const newStudent: StudentProfile = {
       ...profileData,
@@ -881,7 +901,12 @@ export const db = {
     return db.getCourses().find(c => c.code.replace(/\s+/g, '').toUpperCase() === code.replace(/\s+/g, '').toUpperCase());
   },
   getCoursesByLecturer: (lecturerId: string): Course[] => {
-    return db.getCourses().filter(c => c.lecturerId === lecturerId);
+    const lecturer = db.getLecturerById(lecturerId) || db.getLecturerByUserId(lecturerId);
+    const possibleIds = new Set([lecturerId, lecturer?.id, lecturer?.userId].filter(Boolean));
+    return db.getCourses().filter(c => 
+      possibleIds.has(c.lecturerId) || 
+      (lecturer?.assignedCourseIds && lecturer.assignedCourseIds.includes(c.id))
+    );
   },
   getCoursesByDepartment: (department: string): Course[] => {
     return db.getCourses().filter(c => c.department.toLowerCase() === department.toLowerCase());
@@ -1546,10 +1571,10 @@ export const db = {
   registerStudentAsync: async (profileData: Partial<StudentProfile>, password = 'password123'): Promise<User> => {
     const uid = profileData.userId || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const studentLevel = profileData.level || 'HND II';
-    const coursesForLevel = db.getCourses().filter(c => c.department === 'Computer Science' && c.level === studentLevel);
+    const studentDept = profileData.department || 'Computer Science';
     const initialCourseIds = profileData.enrolledCourseIds && profileData.enrolledCourseIds.length > 0
       ? profileData.enrolledCourseIds
-      : (coursesForLevel.length > 0 ? coursesForLevel.map(c => c.id) : ['course_csc401', 'course_csc403']);
+      : db.getMatchingCoursesForStudent(studentDept, studentLevel);
 
     // 1. Create / Update User
     const newUser: User = {
@@ -1621,10 +1646,10 @@ export const db = {
 
   registerStudent: (profileData: Partial<StudentProfile>, password = 'password123'): User => {
     const studentLevel = profileData.level || 'HND II';
-    const coursesForLevel = db.getCourses().filter(c => c.department === 'Computer Science' && c.level === studentLevel);
+    const studentDept = profileData.department || 'Computer Science';
     const initialCourseIds = profileData.enrolledCourseIds && profileData.enrolledCourseIds.length > 0
       ? profileData.enrolledCourseIds
-      : (coursesForLevel.length > 0 ? coursesForLevel.map(c => c.id) : ['course_csc401', 'course_csc403']);
+      : db.getMatchingCoursesForStudent(studentDept, studentLevel);
 
     const newStudent = db.createStudent({
       userId: profileData.userId || '',
@@ -1835,13 +1860,30 @@ export const db = {
     const now = Date.now();
     const activeSessions = sessions.filter(s => s.status === 'active' && s.expirationTime > now);
     
+    const activeStudents = db.getStudents().filter(s => s.status !== 'suspended');
+    const registeredStudentIds = new Set<string>();
+
+    // 1. Direct registrations
     const allRegistrations = db.getRegistrations().filter(r => courseIds.has(r.courseId));
-    const activeStudentIds = new Set(db.getStudents().map(s => s.id));
-    const uniqueStudents = new Set(
-      allRegistrations
-        .map(r => r.studentId)
-        .filter(id => activeStudentIds.has(id))
-    );
+    allRegistrations.forEach(r => {
+      const student = activeStudents.find(s => s.id === r.studentId || s.userId === r.studentId);
+      if (student) {
+        registeredStudentIds.add(student.id);
+      }
+    });
+
+    // 2. Student profile enrolledCourseIds (with auto-sync)
+    activeStudents.forEach(s => {
+      const enrolled = s.enrolledCourseIds || [];
+      if (enrolled.some(cid => courseIds.has(cid))) {
+        registeredStudentIds.add(s.id);
+        enrolled.forEach(cid => {
+          if (courseIds.has(cid) && !db.isStudentRegisteredForCourse(s.id, cid)) {
+            db.registerStudentForCourse(s.id, cid);
+          }
+        });
+      }
+    });
 
     const totalPossibleAttendances = sessions.reduce((sum, s) => sum + (s.totalRegistered || 0), 0);
     const totalPresent = records.length;
@@ -1853,7 +1895,7 @@ export const db = {
       totalCourses: courses.length,
       todaysClasses: sessions.filter(s => s.date === getWATDateString()).length,
       activeSessions: activeSessions.length,
-      totalStudents: uniqueStudents.size,
+      totalStudents: registeredStudentIds.size,
       attendanceRate,
       courses,
       sessions,
