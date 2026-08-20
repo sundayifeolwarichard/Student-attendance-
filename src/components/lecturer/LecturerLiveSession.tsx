@@ -250,8 +250,8 @@ export const LecturerLiveSession: React.FC<LecturerLiveSessionProps> = ({
   const absentStudents = registeredStudents.filter(s => !presentStudentIds.has(s.id));
 
   const filteredPresent = presentRecords.filter(r =>
-    r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.matricNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    (r.studentName || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+    (r.matricNumber || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
 
   const formatCountdown = (seconds: number) => {

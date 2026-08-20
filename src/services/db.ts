@@ -423,7 +423,8 @@ export const db = {
     return db.getUsers().find(u => u.id === id);
   },
   getUserByEmail: (email: string): User | undefined => {
-    return db.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (!email) return undefined;
+    return db.getUsers().find(u => (u.email || '').toLowerCase() === email.toLowerCase());
   },
   getActiveUserId: (): string => {
     return loadItem<string>(STORAGE_KEYS.ACTIVE_USER_ID, '');
@@ -522,7 +523,7 @@ export const db = {
     const users = db.getUsers();
     const user = users.find(u => u.id === userId);
     if (user) {
-      found = students.find(s => s.email.toLowerCase() === user.email.toLowerCase());
+      found = students.find(s => (s.email || '').toLowerCase() === (user.email || '').toLowerCase());
       if (found) {
         found.userId = user.id;
         saveItem(STORAGE_KEYS.STUDENTS, students);
@@ -571,7 +572,8 @@ export const db = {
     return undefined;
   },
   getStudentByMatric: (matric: string): StudentProfile | undefined => {
-    return db.getStudents().find(s => s.matricNumber.trim().toUpperCase() === matric.trim().toUpperCase());
+    if (!matric) return undefined;
+    return db.getStudents().find(s => (s.matricNumber || '').trim().toUpperCase() === matric.trim().toUpperCase());
   },
   createStudent: (profileData: Omit<StudentProfile, 'id'>, password = 'password123'): StudentProfile => {
     let user = db.getUserByEmail(profileData.email);
@@ -678,7 +680,7 @@ export const db = {
     const users = db.getUsers();
     const user = users.find(u => u.id === userId);
     if (user) {
-      found = lecturers.find(l => l.email.toLowerCase() === user.email.toLowerCase());
+      found = lecturers.find(l => (l.email || '').toLowerCase() === (user.email || '').toLowerCase());
       if (found) {
         found.userId = user.id;
         saveItem(STORAGE_KEYS.LECTURERS, lecturers);
@@ -717,7 +719,8 @@ export const db = {
     return undefined;
   },
   getLecturerByStaffId: (staffId: string): LecturerProfile | undefined => {
-    return db.getLecturers().find(l => l.staffId.trim().toUpperCase() === staffId.trim().toUpperCase());
+    if (!staffId) return undefined;
+    return db.getLecturers().find(l => (l.staffId || '').trim().toUpperCase() === staffId.trim().toUpperCase());
   },
   createLecturer: (profileData: Omit<LecturerProfile, 'id'>, password = 'password123'): LecturerProfile => {
     let user = db.getUserByEmail(profileData.email);
@@ -830,7 +833,8 @@ export const db = {
     return db.getDepartments().find(d => d.id === id);
   },
   getDepartmentByCode: (code: string): Department | undefined => {
-    return db.getDepartments().find(d => d.code.toUpperCase() === code.toUpperCase());
+    if (!code) return undefined;
+    return db.getDepartments().find(d => (d.code || '').toUpperCase() === code.toUpperCase());
   },
   createDepartment: (deptData: Omit<Department, 'id'>): Department => {
     const depts = db.getDepartments();
@@ -878,13 +882,15 @@ export const db = {
     return db.getCourses().find(c => c.id === id);
   },
   getCourseByCode: (code: string): Course | undefined => {
-    return db.getCourses().find(c => c.code.replace(/\s+/g, '').toUpperCase() === code.replace(/\s+/g, '').toUpperCase());
+    if (!code) return undefined;
+    return db.getCourses().find(c => (c.code || '').replace(/\s+/g, '').toUpperCase() === code.replace(/\s+/g, '').toUpperCase());
   },
   getCoursesByLecturer: (lecturerId: string): Course[] => {
     return db.getCourses().filter(c => c.lecturerId === lecturerId);
   },
   getCoursesByDepartment: (department: string): Course[] => {
-    return db.getCourses().filter(c => c.department.toLowerCase() === department.toLowerCase());
+    if (!department) return [];
+    return db.getCourses().filter(c => (c.department || '').toLowerCase() === department.toLowerCase());
   },
   getCoursesByLevel: (level: string): Course[] => {
     return db.getCourses().filter(c => c.level === level);

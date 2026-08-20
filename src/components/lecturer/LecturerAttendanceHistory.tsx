@@ -160,7 +160,7 @@ export const LecturerAttendanceHistory: React.FC<LecturerAttendanceHistoryProps>
                             : 'bg-slate-100 text-slate-700 border border-slate-200'
                         }`}
                       >
-                        {s.status.toUpperCase()}
+                        {(s.status || 'ACTIVE').toUpperCase()}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">

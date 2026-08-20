@@ -96,7 +96,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ user, onNavigate }) =>
     const courseObj = courses.find(c => c.id === selectedCourseId || c.code === selectedCourseId);
 
     generateAttendancePDFReport({
-      title: `${reportType.toUpperCase()} ATTENDANCE REPORT`,
+      title: `${(reportType || '').toUpperCase()} ATTENDANCE REPORT`,
       subtitle: `Academic Session: 2025/2026 • ${selectedSemester}`,
       courseCode: courseObj?.code,
       courseTitle: courseObj?.title,

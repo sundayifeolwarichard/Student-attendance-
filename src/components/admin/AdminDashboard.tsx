@@ -479,14 +479,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {stats.students
+                {(stats.students || [])
                   .filter((s: any) =>
-                    s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-                    s.matricNumber.toLowerCase().includes(studentSearch.toLowerCase()) ||
-                    s.department.toLowerCase().includes(studentSearch.toLowerCase())
+                    (s.name || '').toLowerCase().includes(studentSearch.toLowerCase()) ||
+                    (s.matricNumber || '').toLowerCase().includes(studentSearch.toLowerCase()) ||
+                    (s.department || '').toLowerCase().includes(studentSearch.toLowerCase())
                   )
-                  .map((s: any) => (
-                    <tr key={s.id} className="hover:bg-slate-50">
+                  .map((s: any, idx: number) => (
+                    <tr key={s.id || s.matricNumber || `student-${idx}`} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-bold text-slate-950">{s.name}</td>
                       <td className="py-3 px-4 font-mono font-semibold text-slate-700">{s.matricNumber}</td>
                       <td className="py-3 px-4 text-slate-600">{s.department} • {s.level}</td>
@@ -499,7 +499,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                               : 'bg-slate-200 text-slate-600'
                           }`}
                         >
-                          {s.status.toUpperCase()}
+                          {(s.status || 'active').toUpperCase()}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
@@ -578,13 +578,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {stats.lecturers
+                {(stats.lecturers || [])
                   .filter((l: any) =>
-                    l.name.toLowerCase().includes(lecturerSearch.toLowerCase()) ||
-                    l.staffId.toLowerCase().includes(lecturerSearch.toLowerCase())
+                    (l.name || '').toLowerCase().includes(lecturerSearch.toLowerCase()) ||
+                    (l.staffId || '').toLowerCase().includes(lecturerSearch.toLowerCase())
                   )
-                  .map((l: any) => (
-                    <tr key={l.id} className="hover:bg-slate-50">
+                  .map((l: any, idx: number) => (
+                    <tr key={l.id || l.staffId || `lecturer-${idx}`} className="hover:bg-slate-50">
                       <td className="py-3 px-4">
                         <div className="font-bold text-slate-950">{l.name}</div>
                         {l.phone && <div className="text-[11px] text-slate-500 font-mono">{l.phone}</div>}
@@ -600,7 +600,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                               : 'bg-slate-200 text-slate-600'
                           }`}
                         >
-                          {l.status.toUpperCase()}
+                          {(l.status || 'active').toUpperCase()}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
@@ -666,10 +666,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {stats.courses.map((c: any) => {
+                {(stats.courses || []).map((c: any, idx: number) => {
                   const regs = db.getCourseRegistrations(c.id);
                   return (
-                    <tr key={c.id} className="hover:bg-slate-50">
+                    <tr key={c.id || c.code || `course-${idx}`} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-mono font-bold text-slate-950">{c.code}</td>
                       <td className="py-3 px-4 font-bold text-slate-950">{c.title}</td>
                       <td className="py-3 px-4">
@@ -693,8 +693,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
       {/* TAB 5: DEPARTMENTS */}
       {activeTab === 'departments' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-          {stats.departmentBreakdown.map((dept: any) => (
-            <div key={dept.id} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4">
+          {(stats.departmentBreakdown || []).map((dept: any, idx: number) => (
+            <div key={dept.id || dept.code || `dept-${idx}`} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-900 font-mono text-xs font-bold border border-slate-200">
                   {dept.code}
@@ -734,8 +734,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
-                {stats.recentAuditLogs.map((log: AuditLog) => (
-                  <tr key={log.id} className="hover:bg-slate-50 text-[11px]">
+                {(stats.recentAuditLogs || []).map((log: AuditLog, idx: number) => (
+                  <tr key={log.id || `audit-${log.timestamp || idx}`} className="hover:bg-slate-50 text-[11px]">
                     <td className="py-3 px-4 text-slate-600 font-sans">
                       {formatWATDate(log.timestamp)} {formatWATTime(log.timestamp)}
                     </td>
@@ -1286,11 +1286,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                   {db.getUsers()
                     .filter(u => 
                       !userConsoleSearch ||
-                      u.name.toLowerCase().includes(userConsoleSearch.toLowerCase()) ||
-                      u.email.toLowerCase().includes(userConsoleSearch.toLowerCase())
+                      (u.name || '').toLowerCase().includes(userConsoleSearch.toLowerCase()) ||
+                      (u.email || '').toLowerCase().includes(userConsoleSearch.toLowerCase())
                     )
-                    .map(u => (
-                      <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
+                    .map((u, idx) => (
+                      <tr key={u.id || `user-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3 px-4">
                           <div className="font-bold text-slate-900">{u.name}</div>
                           <div className="text-[11px] text-slate-400 font-mono">{u.email}</div>
@@ -1412,8 +1412,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onNavigate
                   className="w-full p-2 border border-slate-300 rounded-xl text-slate-900 bg-slate-50"
                 >
                   <option value="">Select Lecturer...</option>
-                  {stats.lecturers.map((l: any) => (
-                    <option key={l.id} value={l.id}>{l.name} ({l.department})</option>
+                  {(stats.lecturers || []).map((l: any, idx: number) => (
+                    <option key={l.id || l.staffId || `lecturer-opt-${idx}`} value={l.id}>{l.name} ({l.department})</option>
                   ))}
                 </select>
               </div>

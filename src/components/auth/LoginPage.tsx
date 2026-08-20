@@ -130,7 +130,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         if (studentByMatric) {
           user = db.getUserById(studentByMatric.userId);
         } else {
-          const lecturerByStaff = db.getLecturers().find(l => l.staffId.toUpperCase() === trimmedEmail.toUpperCase());
+          const lecturerByStaff = db.getLecturers().find(l => (l.staffId || '').toUpperCase() === trimmedEmail.toUpperCase());
           if (lecturerByStaff) {
             user = db.getUserById(lecturerByStaff.userId);
           }
@@ -146,7 +146,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       if (user.role !== selectedRole) {
         setIsSubmitting(false);
-        setError(`This account is registered as a ${user.role.toUpperCase()}. Please select the ${user.role} tab above.`);
+        setError(`This account is registered as a ${(user.role || '').toUpperCase()}. Please select the ${user.role} tab above.`);
         return;
       }
 

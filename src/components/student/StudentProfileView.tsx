@@ -159,7 +159,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({ user, on
             <div className="flex justify-between py-1">
               <span className="text-slate-500">Portal Status:</span>
               <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-900 border border-slate-300 font-bold text-[10px]">
-                {student.status.toUpperCase()}
+                {(student.status || 'ACTIVE').toUpperCase()}
               </span>
             </div>
           </div>
